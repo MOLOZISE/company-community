@@ -1,0 +1,61 @@
+{
+  "rules": [
+    {
+      "description": "Always use Turborepo for builds",
+      "glob": "**/*.{ts,tsx,js}",
+      "rule": "When making changes, run 'pnpm build' to verify no breakage across workspaces."
+    },
+    {
+      "description": "Type safety first - Zod + TypeScript",
+      "glob": "packages/api/src/routers/**/*.ts",
+      "rule": "All tRPC procedures must have: (1) Zod input schema, (2) Explicit return type, (3) JSDoc comment explaining purpose."
+    },
+    {
+      "description": "Database schema changes",
+      "glob": "packages/db/src/schema/**",
+      "rule": "After modifying schema: 1) Run 'pnpm db:push' to sync to Supabase, 2) Verify via Drizzle Studio"
+    },
+    {
+      "description": "Component patterns",
+      "glob": "apps/web/src/components/**",
+      "rule": "Use 'use client' directive for interactive components. Keep server components for data fetching layouts."
+    },
+    {
+      "description": "tRPC client usage",
+      "glob": "apps/web/src/**/*.tsx",
+      "rule": "Use 'const { data } = trpc.feature.operation.useQuery()' for queries, 'const mutation = trpc.feature.operation.useMutation()' for mutations."
+    },
+    {
+      "description": "Environment variables",
+      "glob": ".env*",
+      "rule": "NEVER commit .env.local. NEXT_PUBLIC_* variables are exposed to client. All others are server-only."
+    },
+    {
+      "description": "Git workflow",
+      "glob": "**/*",
+      "rule": "Branch naming: feature/week-X-description. Commits: semantic (feat:, fix:, refactor:). Push to GitHub, Vercel auto-deploys main."
+    }
+  ],
+  "hooks": [
+    {
+      "trigger": "before-write",
+      "description": "Verify TypeScript before saving to typed files",
+      "command": "if echo '{filePath}' | grep -E '\\.(ts|tsx)$'; then pnpm type-check --noEmit; fi"
+    }
+  ],
+  "excludedPaths": [
+    "node_modules/**",
+    ".next/**",
+    "dist/**",
+    ".drizzle/**",
+    ".env.local",
+    ".env.*.local",
+    "pnpm-lock.yaml"
+  ],
+  "defaultPermissions": {
+    "Bash": ["run package scripts (pnpm)", "git commands", "file navigation (ls, cd)"],
+    "Read": ["all project files except secrets"],
+    "Edit": ["code files, config files"],
+    "Write": ["code files, config files, package.json"]
+  }
+}
