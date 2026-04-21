@@ -14,7 +14,7 @@ export function ImageUpload({ onFile, preview }: ImageUploadProps) {
   function handleFile(file: File) {
     if (!file.type.startsWith('image/')) return;
     if (file.size > 10 * 1024 * 1024) {
-      alert('이미지는 10MB 이하만 업로드 가능합니다.');
+      alert('이미지는 10MB 이하만 업로드할 수 있습니다.');
       return;
     }
     onFile(file);
@@ -36,13 +36,14 @@ export function ImageUpload({ onFile, preview }: ImageUploadProps) {
     return (
       <div className="relative inline-block">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={preview} alt="preview" className="max-h-48 rounded-lg object-cover" />
+        <img src={preview} alt="첨부 이미지 미리보기" className="max-h-48 rounded-lg object-cover" />
         <button
           type="button"
           onClick={() => onFile(null)}
-          className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center hover:bg-black/80"
+          className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-xs text-white hover:bg-black/80"
+          aria-label="이미지 제거"
         >
-          ✕
+          x
         </button>
       </div>
     );
@@ -50,16 +51,19 @@ export function ImageUpload({ onFile, preview }: ImageUploadProps) {
 
   return (
     <div
-      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragging(true);
+      }}
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
       onClick={() => inputRef.current?.click()}
-      className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
+      className={`cursor-pointer rounded-lg border-2 border-dashed p-4 text-center transition-colors ${
         dragging ? 'border-blue-400 bg-blue-50' : 'border-slate-300 hover:border-slate-400'
       }`}
     >
-      <p className="text-sm text-slate-500">이미지 드래그 또는 클릭하여 업로드</p>
-      <p className="text-xs text-slate-400 mt-1">최대 10MB</p>
+      <p className="text-sm text-slate-500">이미지를 드래그하거나 클릭해서 업로드</p>
+      <p className="mt-1 text-xs text-slate-400">최대 10MB</p>
       <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleChange} />
     </div>
   );

@@ -3,25 +3,29 @@ interface SkeletonProps {
 }
 
 export function Skeleton({ className = '' }: SkeletonProps) {
-  return (
-    <div className={`animate-pulse bg-slate-200 rounded-lg ${className}`} />
-  );
+  return <div className={`animate-pulse rounded-md bg-slate-200 ${className}`} />;
 }
 
 export function PostCardSkeleton() {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <Skeleton className="w-16 h-3" />
-        <Skeleton className="w-10 h-3" />
+    <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-7 w-7 rounded-full" />
+          <div className="space-y-1.5">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-2.5 w-16" />
+          </div>
+        </div>
+        <Skeleton className="h-6 w-16 rounded-full" />
       </div>
-      <Skeleton className="w-3/4 h-4" />
-      <Skeleton className="w-full h-3" />
-      <Skeleton className="w-2/3 h-3" />
-      <div className="flex gap-4 pt-1">
-        <Skeleton className="w-10 h-3" />
-        <Skeleton className="w-10 h-3" />
-        <Skeleton className="w-10 h-3" />
+      <Skeleton className="h-5 w-4/5" />
+      <Skeleton className="h-3 w-full" />
+      <Skeleton className="h-3 w-2/3" />
+      <div className="flex gap-3 pt-1">
+        <Skeleton className="h-7 w-16 rounded-full" />
+        <Skeleton className="h-7 w-16 rounded-full" />
+        <Skeleton className="h-7 w-16 rounded-full" />
       </div>
     </div>
   );
@@ -31,11 +35,11 @@ export function CommentSkeleton() {
   return (
     <div className="py-3 space-y-2">
       <div className="flex items-center gap-2">
-        <Skeleton className="w-12 h-3" />
-        <Skeleton className="w-8 h-3" />
+        <Skeleton className="h-3 w-12" />
+        <Skeleton className="h-3 w-8" />
       </div>
-      <Skeleton className="w-full h-3" />
-      <Skeleton className="w-4/5 h-3" />
+      <Skeleton className="h-3 w-full" />
+      <Skeleton className="h-3 w-4/5" />
     </div>
   );
 }

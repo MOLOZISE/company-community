@@ -18,7 +18,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     if (!isLoading && !user) router.replace('/login');
   }, [user, isLoading, router]);
 
-  // Close drawer on resize to desktop
   useEffect(() => {
     function onResize() {
       if (window.innerWidth >= 768) setDrawerOpen(false);
@@ -34,8 +33,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-slate-400 text-sm">로딩 중...</div>
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="text-sm text-slate-400">로딩 중...</div>
       </div>
     );
   }
@@ -44,36 +43,35 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Mobile hamburger */}
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
+          <div className="flex shrink-0 items-center gap-2">
             <button
               onClick={() => setDrawerOpen(true)}
-              className="md:hidden p-1.5 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-100"
+              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 md:hidden"
               aria-label="채널 메뉴 열기"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <Link href="/feed" className="font-bold text-slate-900 hover:text-blue-600">
+            <Link href="/feed" className="font-bold text-slate-950 hover:text-blue-600">
               Company Community
             </Link>
           </div>
 
-          <div className="flex-1 flex justify-center">
+          <div className="flex flex-1 justify-center">
             <SearchBar />
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex shrink-0 items-center gap-2">
             <NotificationBell />
-            <Link href="/profile" className="text-sm text-slate-500 hover:text-slate-900 px-2 py-1">
+            <Link href="/profile" className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-900">
               프로필
             </Link>
             <button
               onClick={handleLogout}
-              className="text-sm text-slate-500 hover:text-slate-900 px-2 py-1"
+              className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-900"
             >
               로그아웃
             </button>
@@ -81,36 +79,32 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         </div>
       </header>
 
-      {/* Mobile sidebar drawer */}
       {drawerOpen && (
         <>
-          <div
-            className="fixed inset-0 z-20 bg-black/40 md:hidden"
-            onClick={() => setDrawerOpen(false)}
-          />
-          <div className="fixed left-0 top-0 h-full w-64 z-30 bg-white shadow-xl md:hidden overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+          <div className="fixed inset-0 z-20 bg-black/40 md:hidden" onClick={() => setDrawerOpen(false)} />
+          <div className="fixed left-0 top-0 z-30 h-full w-72 overflow-y-auto bg-white shadow-xl md:hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 p-4">
               <span className="font-semibold text-slate-800">채널</span>
               <button
                 onClick={() => setDrawerOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded"
+                className="rounded p-1 text-slate-400 hover:text-slate-600"
                 aria-label="닫기"
               >
-                ✕
+                닫기
               </button>
             </div>
-            <div className="p-2">
+            <div className="p-3">
               <Sidebar onNavigate={() => setDrawerOpen(false)} />
             </div>
           </div>
         </>
       )}
 
-      <div className="max-w-5xl mx-auto px-4 py-6 flex gap-6">
+      <div className="mx-auto flex max-w-6xl gap-6 px-4 py-6">
         <div className="hidden md:block">
           <Sidebar />
         </div>
-        <main className="flex-1 min-w-0">{children}</main>
+        <main className="min-w-0 flex-1">{children}</main>
       </div>
     </div>
   );

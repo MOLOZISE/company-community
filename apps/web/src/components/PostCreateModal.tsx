@@ -14,11 +14,23 @@ interface PostCreateModalProps {
   onClose: () => void;
   onCreated: () => void;
   defaultChannelId?: string;
+  initialContent?: string;
 }
 
-export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCreateModalProps) {
+const QUICK_TITLES = [
+  '동료들에게 질문이 있어요',
+  '업무 팁을 공유합니다',
+  '요즘 회사 생활 고민',
+];
+
+export function PostCreateModal({
+  onClose,
+  onCreated,
+  defaultChannelId,
+  initialContent = '',
+}: PostCreateModalProps) {
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState(initialContent);
   const [channelId, setChannelId] = useState(defaultChannelId ?? '');
   const [flair, setFlair] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
@@ -37,8 +49,14 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!channelId) { setError('채널을 선택해주세요.'); return; }
-    if (!content.trim()) { setError('내용을 입력해주세요.'); return; }
+    if (!channelId) {
+      setError('게시할 채널을 선택해주세요.');
+      return;
+    }
+    if (!content.trim()) {
+      setError('내용을 입력해주세요.');
+      return;
+    }
     setError('');
     setUploading(true);
 
@@ -62,7 +80,7 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
       onCreated();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '게시물 작성 실패');
+      setError(err instanceof Error ? err.message : '게시물 작성에 실패했습니다.');
     } finally {
       setUploading(false);
     }
@@ -71,83 +89,116 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto"
+        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-slate-900">게시물 작성</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl" aria-label="닫기">✕</button>
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-950">새 글 작성</h2>
+            <p className="mt-1 text-sm text-slate-500">질문, 공유, 고민을 동료들과 나눠보세요.</p>
+          </div>
+          <button onClick={onClose} className="rounded-md px-2 py-1 text-sm text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="닫기">
+            닫기
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <select
-            value={channelId}
-            onChange={(e) => setChannelId(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">채널 선택</option>
-            {channelsData?.items.map((ch) => (
-              <option key={ch.id} value={ch.id}>{ch.name}</option>
-            ))}
-          </select>
-
-          {/* Flair chips */}
-          <div className="flex flex-wrap gap-1.5">
-            {FLAIRS.map((f) => (
-              <button
-                key={f.value}
-                type="button"
-                onClick={() => setFlair(flair === f.value ? '' : f.value)}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-                  flair === f.value
-                    ? f.color + ' border-transparent'
-                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">채널</label>
+            <select
+              value={channelId}
+              onChange={(e) => setChannelId(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">채널 선택</option>
+              {channelsData?.items.map((ch) => (
+                <option key={ch.id} value={ch.id}>
+                  {ch.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">글 유형</label>
+            <div className="flex flex-wrap gap-1.5">
+              {FLAIRS.map((f) => (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => setFlair(flair === f.value ? '' : f.value)}
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                    flair === f.value
+                      ? f.color
+                      : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">제목</label>
+              <div className="hidden gap-1 sm:flex">
+                {QUICK_TITLES.map((quickTitle) => (
+                  <button
+                    key={quickTitle}
+                    type="button"
+                    onClick={() => setTitle(quickTitle)}
+                    className="rounded-full bg-slate-100 px-2 py-1 text-[11px] text-slate-500 hover:bg-slate-200"
+                  >
+                    {quickTitle}
+                  </button>
+                ))}
+              </div>
+            </div>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value.slice(0, MAX_TITLE))}
-              placeholder="제목 (선택)"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="제목은 선택 사항입니다"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             {title.length > MAX_TITLE * 0.8 && (
-              <p className={`text-xs mt-0.5 text-right ${title.length >= MAX_TITLE ? 'text-red-400' : 'text-slate-400'}`}>
+              <p className={`mt-0.5 text-right text-xs ${title.length >= MAX_TITLE ? 'text-red-400' : 'text-slate-400'}`}>
                 {title.length}/{MAX_TITLE}
               </p>
             )}
           </div>
 
           <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">내용</label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value.slice(0, MAX_CONTENT))}
-              rows={5}
-              placeholder="내용을 입력하세요..."
+              rows={7}
+              placeholder="상황, 궁금한 점, 원하는 조언을 편하게 적어주세요."
               required
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm leading-6 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <p className={`text-xs mt-0.5 text-right ${content.length > MAX_CONTENT * 0.9 ? 'text-red-400' : 'text-slate-400'}`}>
+            <p className={`mt-0.5 text-right text-xs ${content.length > MAX_CONTENT * 0.9 ? 'text-red-400' : 'text-slate-400'}`}>
               {content.length}/{MAX_CONTENT}
             </p>
           </div>
 
           <ImageUpload onFile={handleFile} preview={imagePreview} />
 
-          <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+          <label className="flex cursor-pointer items-start gap-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
             <input
               type="checkbox"
               checked={isAnonymous}
               onChange={(e) => setIsAnonymous(e.target.checked)}
-              className="rounded"
+              className="mt-0.5 rounded"
             />
-            익명으로 게시
+            <span>
+              <span className="block font-medium text-slate-800">익명으로 게시</span>
+              <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                프로필 대신 익명 별칭으로 표시됩니다.
+              </span>
+            </span>
           </label>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
@@ -156,14 +207,14 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm hover:bg-slate-50"
+              className="flex-1 rounded-lg border border-slate-300 py-2 text-sm text-slate-700 hover:bg-slate-50"
             >
               취소
             </button>
             <button
               type="submit"
               disabled={uploading || createPost.isLoading}
-              className="flex-1 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50"
+              className="flex-1 rounded-lg bg-blue-600 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
             >
               {uploading ? '업로드 중...' : createPost.isLoading ? '게시 중...' : '게시하기'}
             </button>

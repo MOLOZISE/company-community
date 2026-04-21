@@ -8,14 +8,32 @@ const postSelect = {
   ...getTableColumns(posts),
   authorName: profiles.displayName,
   authorAvatar: profiles.avatarUrl,
+  channelName: channels.name,
+  channelSlug: channels.slug,
 };
 
 const ANON_ANIMALS = [
-  '강아지', '고양이', '토끼', '사자', '호랑이', '곰', '여우', '늑대', '코끼리', '기린',
-  '펭귄', '오리', '독수리', '두더지', '너구리', '수달', '고슴도치', '다람쥐',
+  '강아지',
+  '고양이',
+  '여우',
+  '사자',
+  '호랑이',
+  '곰',
+  '다람쥐',
+  '토끼',
+  '코끼리',
+  '기린',
+  '펭귄',
+  '오리',
+  '독수리',
+  '부엉이',
+  '개구리',
+  '수달',
+  '고슴도치',
+  '알파카',
 ];
 
-// djb2 hash — same seed+postId always produces same index
+// djb2 hash: same seed+postId always produces the same anonymous alias.
 function djb2(str: string): number {
   let h = 5381;
   for (let i = 0; i < str.length; i++) {
@@ -28,7 +46,7 @@ function generateDeterministicAlias(anonymousSeed: string, postId: string): stri
   const hash = djb2(anonymousSeed + postId);
   const animal = ANON_ANIMALS[hash % ANON_ANIMALS.length];
   const num = hash % 100;
-  return `익명${animal}${num}`;
+  return `익명 ${animal}${num}`;
 }
 
 export const postsRouter = router({
@@ -62,6 +80,7 @@ export const postsRouter = router({
         .select(postSelect)
         .from(posts)
         .leftJoin(profiles, eq(posts.authorId, profiles.id))
+        .leftJoin(channels, eq(posts.channelId, channels.id))
         .where(whereClause)
         .orderBy(orderCol)
         .limit(input.limit)
@@ -80,6 +99,7 @@ export const postsRouter = router({
         .select(postSelect)
         .from(posts)
         .leftJoin(profiles, eq(posts.authorId, profiles.id))
+        .leftJoin(channels, eq(posts.channelId, channels.id))
         .where(eq(posts.id, input.id))
         .limit(1);
 
@@ -161,8 +181,9 @@ export const postsRouter = router({
         .limit(1);
 
       if (!post) throw new TRPCError({ code: 'NOT_FOUND', message: 'Post not found' });
-      if (post.authorId !== ctx.userId)
+      if (post.authorId !== ctx.userId) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your post' });
+      }
 
       await db.update(posts).set({ isDeleted: true }).where(eq(posts.id, input.id));
       return { success: true };
@@ -172,13 +193,26 @@ export const postsRouter = router({
    * Get all posts by a specific author (non-anonymous only, public)
    */
   getByAuthor: publicProcedure
-    .input(z.object({ authorId: z.string(), limit: z.number().min(1).max(50).default(20), offset: z.number().default(0) }))
+    .input(
+      z.object({
+        authorId: z.string(),
+        limit: z.number().min(1).max(50).default(20),
+        offset: z.number().default(0),
+      })
+    )
     .query(async ({ input }) => {
       const items = await db
         .select(postSelect)
         .from(posts)
         .leftJoin(profiles, eq(posts.authorId, profiles.id))
-        .where(and(eq(posts.authorId, input.authorId), eq(posts.isDeleted, false), eq(posts.isAnonymous, false)))
+        .leftJoin(channels, eq(posts.channelId, channels.id))
+        .where(
+          and(
+            eq(posts.authorId, input.authorId),
+            eq(posts.isDeleted, false),
+            eq(posts.isAnonymous, false)
+          )
+        )
         .orderBy(desc(posts.createdAt))
         .limit(input.limit)
         .offset(input.offset);
@@ -195,6 +229,7 @@ export const postsRouter = router({
         .select(postSelect)
         .from(posts)
         .leftJoin(profiles, eq(posts.authorId, profiles.id))
+        .leftJoin(channels, eq(posts.channelId, channels.id))
         .where(and(eq(posts.authorId, ctx.userId), eq(posts.isDeleted, false)))
         .orderBy(desc(posts.createdAt))
         .limit(input.limit)
@@ -215,10 +250,15 @@ export const postsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const [post] = await db.select({ authorId: posts.authorId }).from(posts).where(eq(posts.id, input.id)).limit(1);
+      const [post] = await db
+        .select({ authorId: posts.authorId })
+        .from(posts)
+        .where(eq(posts.id, input.id))
+        .limit(1);
       if (!post) throw new TRPCError({ code: 'NOT_FOUND', message: 'Post not found' });
-      if (post.authorId !== ctx.userId)
+      if (post.authorId !== ctx.userId) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your post' });
+      }
 
       const [updated] = await db
         .update(posts)
@@ -239,6 +279,7 @@ export const postsRouter = router({
         .select(postSelect)
         .from(posts)
         .leftJoin(profiles, eq(posts.authorId, profiles.id))
+        .leftJoin(channels, eq(posts.channelId, channels.id))
         .where(
           and(
             eq(posts.isDeleted, false),
@@ -258,9 +299,14 @@ export const postsRouter = router({
       const [post] = await db.select({ channelId: posts.channelId }).from(posts).where(eq(posts.id, input.id)).limit(1);
       if (!post) throw new TRPCError({ code: 'NOT_FOUND', message: 'Post not found' });
 
-      const [channel] = await db.select({ createdBy: channels.createdBy }).from(channels).where(eq(channels.id, post.channelId)).limit(1);
-      if (!channel || channel.createdBy !== ctx.userId)
+      const [channel] = await db
+        .select({ createdBy: channels.createdBy })
+        .from(channels)
+        .where(eq(channels.id, post.channelId))
+        .limit(1);
+      if (!channel || channel.createdBy !== ctx.userId) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Channel admin only' });
+      }
 
       await db.update(posts).set({ isPinned: input.pinned }).where(eq(posts.id, input.id));
       return { success: true };
