@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useAuthStore } from '@/store/auth';
 import { trpc } from '@/lib/trpc';
+import { relativeTime } from '@/lib/time';
 
 type Post = {
   id: string;
@@ -17,16 +18,6 @@ type Post = {
   mediaUrls: string[] | null;
   createdAt: Date | string | null;
 };
-
-function relativeTime(date: Date): string {
-  const diffMs = Date.now() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return '방금';
-  if (diffMin < 60) return `${diffMin}분 전`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}시간 전`;
-  return `${Math.floor(diffHr / 24)}일 전`;
-}
 
 interface PostCardProps {
   post: Post;
@@ -46,7 +37,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 text-xs text-slate-500">
           <span className="font-medium text-slate-700">{authorLabel}</span>
-          {post.createdAt && <span>{relativeTime(new Date(post.createdAt))}</span>}
+          {post.createdAt && <span>{relativeTime(post.createdAt)}</span>}
         </div>
         {isOwner && (
           <button

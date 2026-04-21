@@ -4,40 +4,27 @@ import { useState } from 'react';
 import { trpc } from '@/lib/trpc';
 import { useAuthStore } from '@/store/auth';
 import { VoteButton } from './VoteButton';
+import { relativeTime } from '@/lib/time';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { AppRouter } from '@repo/api';
 
 type RouterOutput = inferRouterOutputs<AppRouter>;
 type CommentWithReplies = RouterOutput['comments']['getByPost'][number];
-
-function relativeTime(date: Date | string | null): string {
-  if (!date) return '';
-  const diffMs = Date.now() - new Date(date).getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return '방금';
-  if (diffMin < 60) return `${diffMin}분 전`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}시간 전`;
-  return `${Math.floor(diffHr / 24)}일 전`;
-}
+type Reply = CommentWithReplies['replies'][number];
 
 interface CommentItemProps {
-  comment: CommentWithReplies | CommentWithReplies['replies'][number];
+  comment: CommentWithReplies | Reply;
   postId: string;
+  myVotes: Record<string, 'up' | 'down'>;
   isReply?: boolean;
 }
 
-function CommentItem({ comment, postId, isReply = false }: CommentItemProps) {
+function CommentItem({ comment, postId, myVotes, isReply = false }: CommentItemProps) {
   const { user } = useAuthStore();
   const [replying, setReplying] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [replyAnon, setReplyAnon] = useState(false);
   const utils = trpc.useContext();
-
-  const myVoteQuery = trpc.votes.getMyVote.useQuery(
-    { targetType: 'comment', targetId: comment.id },
-    { enabled: !!user }
-  );
 
   const deleteComment = trpc.comments.delete.useMutation({
     onSuccess: () => utils.comments.getByPost.invalidate({ postId }),
@@ -55,7 +42,7 @@ function CommentItem({ comment, postId, isReply = false }: CommentItemProps) {
   const isOwner = user?.id === comment.authorId;
 
   return (
-    <div className={`${isReply ? 'ml-8 border-l-2 border-slate-100 pl-4' : ''}`}>
+    <div className={isReply ? 'ml-8 border-l-2 border-slate-100 pl-4' : ''}>
       <div className="py-3">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-sm font-medium text-slate-700">{authorLabel}</span>
@@ -75,7 +62,7 @@ function CommentItem({ comment, postId, isReply = false }: CommentItemProps) {
             targetType="comment"
             targetId={comment.id}
             upvoteCount={comment.upvoteCount ?? 0}
-            currentVote={(myVoteQuery.data as 'up' | 'down' | null) ?? null}
+            currentVote={myVotes[comment.id] ?? null}
           />
           {!isReply && (
             <button
@@ -138,15 +125,25 @@ function CommentItem({ comment, postId, isReply = false }: CommentItemProps) {
 
 interface CommentSectionProps {
   postId: string;
+  commentCount: number;
 }
 
-export function CommentSection({ postId }: CommentSectionProps) {
+export function CommentSection({ postId, commentCount }: CommentSectionProps) {
   const { user } = useAuthStore();
   const [text, setText] = useState('');
   const [isAnon, setIsAnon] = useState(false);
   const utils = trpc.useContext();
 
   const { data: commentTree, isLoading } = trpc.comments.getByPost.useQuery({ postId });
+
+  const allCommentIds = commentTree
+    ? commentTree.flatMap((c) => [c.id, ...c.replies.map((r) => r.id)])
+    : [];
+
+  const { data: myVotes = {} } = trpc.votes.getMyVotesForComments.useQuery(
+    { commentIds: allCommentIds },
+    { enabled: !!user && allCommentIds.length > 0 }
+  );
 
   const createComment = trpc.comments.create.useMutation({
     onSuccess: () => {
@@ -157,9 +154,7 @@ export function CommentSection({ postId }: CommentSectionProps) {
 
   return (
     <div className="mt-6 pt-6 border-t border-slate-100">
-      <h2 className="text-sm font-semibold text-slate-700 mb-4">
-        댓글 {commentTree ? commentTree.reduce((acc, c) => acc + 1 + c.replies.length, 0) : ''}
-      </h2>
+      <h2 className="text-sm font-semibold text-slate-700 mb-4">댓글 {commentCount}</h2>
 
       {user ? (
         <div className="mb-6">
@@ -201,9 +196,9 @@ export function CommentSection({ postId }: CommentSectionProps) {
         <div className="divide-y divide-slate-50">
           {commentTree?.map((comment) => (
             <div key={comment.id}>
-              <CommentItem comment={comment} postId={postId} />
+              <CommentItem comment={comment} postId={postId} myVotes={myVotes} />
               {comment.replies.map((reply) => (
-                <CommentItem key={reply.id} comment={reply} postId={postId} isReply />
+                <CommentItem key={reply.id} comment={reply} postId={postId} myVotes={myVotes} isReply />
               ))}
             </div>
           ))}

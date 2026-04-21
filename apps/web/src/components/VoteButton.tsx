@@ -28,9 +28,12 @@ export function VoteButton({
   const voteMutation = trpc.votes.vote.useMutation({
     onSuccess: () => {
       onVoted?.();
-      utils.posts.getById.invalidate();
-      utils.posts.getFeed.invalidate();
-      utils.comments.getByPost.invalidate();
+      if (targetType === 'post') {
+        utils.posts.getById.invalidate({ id: targetId });
+        utils.posts.getFeed.invalidate();
+      } else {
+        utils.votes.getMyVotesForComments.invalidate();
+      }
     },
   });
 

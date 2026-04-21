@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc.js';
 import { db, votes, posts, comments } from '@repo/db';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, inArray } from 'drizzle-orm';
 
 const voteTargetSchema = z.object({
   targetType: z.enum(['post', 'comment']),
@@ -32,27 +32,26 @@ export const votesRouter = router({
 
     if (existing) {
       if (existing.voteType === voteType) {
-        // Toggle off — remove vote
         await db.delete(votes).where(eq(votes.id, existing.id));
         await adjustCount(targetType, targetId, voteType, -1);
         return { action: 'removed' as const };
       } else {
-        // Switch vote
         await db.update(votes).set({ voteType }).where(eq(votes.id, existing.id));
-        await adjustCount(targetType, targetId, existing.voteType as 'up' | 'down', -1);
-        await adjustCount(targetType, targetId, voteType, 1);
+        await Promise.all([
+          adjustCount(targetType, targetId, existing.voteType as 'up' | 'down', -1),
+          adjustCount(targetType, targetId, voteType, 1),
+        ]);
         return { action: 'switched' as const };
       }
     }
 
-    // New vote
     await db.insert(votes).values({ userId, targetType, targetId, voteType });
     await adjustCount(targetType, targetId, voteType, 1);
     return { action: 'added' as const };
   }),
 
   /**
-   * Get the current user's vote on a target
+   * Get the current user's vote on a single target
    */
   getMyVote: protectedProcedure
     .input(z.object({ targetType: z.enum(['post', 'comment']), targetId: z.string() }))
@@ -68,7 +67,27 @@ export const votesRouter = router({
           )
         )
         .limit(1);
-      return vote?.voteType ?? null;
+      return (vote?.voteType ?? null) as 'up' | 'down' | null;
+    }),
+
+  /**
+   * Batch fetch vote status for multiple comment IDs in one query
+   */
+  getMyVotesForComments: protectedProcedure
+    .input(z.object({ commentIds: z.array(z.string()) }))
+    .query(async ({ input, ctx }) => {
+      if (input.commentIds.length === 0) return {};
+      const rows = await db
+        .select({ targetId: votes.targetId, voteType: votes.voteType })
+        .from(votes)
+        .where(
+          and(
+            eq(votes.userId, ctx.userId),
+            eq(votes.targetType, 'comment'),
+            inArray(votes.targetId, input.commentIds)
+          )
+        );
+      return Object.fromEntries(rows.map((r) => [r.targetId, r.voteType as 'up' | 'down']));
     }),
 });
 
@@ -78,19 +97,17 @@ async function adjustCount(
   voteType: 'up' | 'down',
   delta: 1 | -1
 ) {
-  const col = voteType === 'up' ? 'upvote_count' : 'downvote_count';
   if (targetType === 'post') {
     const field = voteType === 'up' ? posts.upvoteCount : posts.downvoteCount;
+    const key = voteType === 'up' ? 'upvoteCount' : 'downvoteCount';
     await db
       .update(posts)
-      .set({ [col === 'upvote_count' ? 'upvoteCount' : 'downvoteCount']: sql`${field} + ${delta}` })
+      .set({ [key]: sql`${field} + ${delta}` })
       .where(eq(posts.id, targetId));
-  } else if (targetType === 'comment') {
-    if (voteType === 'up') {
-      await db
-        .update(comments)
-        .set({ upvoteCount: sql`${comments.upvoteCount} + ${delta}` })
-        .where(eq(comments.id, targetId));
-    }
+  } else if (targetType === 'comment' && voteType === 'up') {
+    await db
+      .update(comments)
+      .set({ upvoteCount: sql`${comments.upvoteCount} + ${delta}` })
+      .where(eq(comments.id, targetId));
   }
 }
