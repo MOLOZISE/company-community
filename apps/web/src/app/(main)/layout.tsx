@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/auth';
 import { Sidebar } from '@/components/Sidebar';
+import { NotificationBell } from '@/components/NotificationBell';
+import { SearchBar } from '@/components/SearchBar';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -35,17 +37,23 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/feed" className="font-bold text-slate-900 hover:text-blue-600">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+          <Link href="/feed" className="font-bold text-slate-900 hover:text-blue-600 shrink-0">
             Company Community
           </Link>
-          <div className="flex items-center gap-4">
-            <Link href="/profile" className="text-sm text-slate-500 hover:text-slate-900">
+
+          <div className="flex-1 flex justify-center">
+            <SearchBar />
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <NotificationBell />
+            <Link href="/profile" className="text-sm text-slate-500 hover:text-slate-900 px-2 py-1">
               프로필
             </Link>
             <button
               onClick={handleLogout}
-              className="text-sm text-slate-500 hover:text-slate-900"
+              className="text-sm text-slate-500 hover:text-slate-900 px-2 py-1"
             >
               로그아웃
             </button>

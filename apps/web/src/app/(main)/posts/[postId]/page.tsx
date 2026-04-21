@@ -6,6 +6,7 @@ import { trpc } from '@/lib/trpc';
 import { useAuthStore } from '@/store/auth';
 import { VoteButton } from '@/components/VoteButton';
 import { CommentSection } from '@/components/CommentSection';
+import { ReportButton } from '@/components/ReportButton';
 import { relativeTime } from '@/lib/time';
 
 export default function PostDetailPage({ params }: { params: Promise<{ postId: string }> }) {
@@ -52,15 +53,18 @@ export default function PostDetailPage({ params }: { params: Promise<{ postId: s
             <h1 className="text-2xl font-bold text-slate-900">{post.title}</h1>
           )}
         </div>
-        {isOwner && (
-          <button
-            onClick={() => deletePost.mutate({ id: post.id })}
-            disabled={deletePost.isLoading}
-            className="text-sm text-slate-400 hover:text-red-500"
-          >
-            삭제
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {!isOwner && <ReportButton targetType="post" targetId={post.id} />}
+          {isOwner && (
+            <button
+              onClick={() => deletePost.mutate({ id: post.id })}
+              disabled={deletePost.isLoading}
+              className="text-sm text-slate-400 hover:text-red-500"
+            >
+              삭제
+            </button>
+          )}
+        </div>
       </div>
 
       <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{post.content}</p>

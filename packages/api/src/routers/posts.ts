@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, protectedProcedure } from '../trpc.js';
 import { db, posts } from '@repo/db';
-import { eq, desc, and, sql } from 'drizzle-orm';
+import { eq, desc, and, sql, ilike, or } from 'drizzle-orm';
 
 const ANON_ANIMALS = [
   '강아지', '고양이', '토끼', '사자', '호랑이', '곰', '여우', '늑대', '코끼리', '기린',
@@ -119,6 +119,26 @@ export const postsRouter = router({
 
       await db.update(posts).set({ isDeleted: true }).where(eq(posts.id, input.id));
       return { success: true };
+    }),
+
+  /**
+   * Search posts by title or content
+   */
+  search: publicProcedure
+    .input(z.object({ q: z.string().min(1).max(100), limit: z.number().min(1).max(50).default(20) }))
+    .query(async ({ input }) => {
+      const term = `%${input.q}%`;
+      return db
+        .select()
+        .from(posts)
+        .where(
+          and(
+            eq(posts.isDeleted, false),
+            or(ilike(posts.title, term), ilike(posts.content, term))
+          )
+        )
+        .orderBy(desc(posts.createdAt))
+        .limit(input.limit);
     }),
 
   /**
