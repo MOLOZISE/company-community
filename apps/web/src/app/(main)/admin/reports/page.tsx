@@ -6,25 +6,27 @@ import { trpc } from '@/lib/trpc';
 import { relativeTime } from '@/lib/time';
 import { toast } from '@/store/toast';
 
-const REASON_LABELS: Record<string, string> = {
+const REASON_LABELS = {
   spam: '스팸',
   harassment: '괴롭힘',
   misinformation: '허위정보',
   inappropriate: '부적절한 내용',
   other: '기타',
-};
+} as const;
 
-const STATUS_LABELS: Record<string, string> = {
+const STATUS_LABELS = {
   pending: '검토 중',
   resolved: '처리 완료',
   dismissed: '기각',
-};
+} as const;
 
-const STATUS_COLORS: Record<string, string> = {
+const STATUS_COLORS = {
   pending: 'bg-yellow-100 text-yellow-700',
   resolved: 'bg-green-100 text-green-700',
   dismissed: 'bg-slate-100 text-slate-600',
-};
+} as const;
+
+type ReportStatus = keyof typeof STATUS_LABELS;
 
 export default function AdminReportsPage() {
   const [filter, setFilter] = useState<'pending' | 'resolved' | 'dismissed' | undefined>(undefined);
@@ -78,11 +80,11 @@ export default function AdminReportsPage() {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[report.status ?? 'pending']}`}>
-                      {STATUS_LABELS[report.status ?? 'pending']}
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[(report.status ?? 'pending') as ReportStatus]}`}>
+                      {STATUS_LABELS[(report.status ?? 'pending') as ReportStatus]}
                     </span>
                     <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                      {REASON_LABELS[report.reason] ?? report.reason}
+                      {REASON_LABELS[report.reason as keyof typeof REASON_LABELS] ?? report.reason}
                     </span>
                     <span className="text-xs text-slate-400 capitalize">{report.targetType}</span>
                     <Link

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { trpc } from '@/lib/trpc';
+import { Avatar } from './Avatar';
 import { uploadAvatar } from '@/lib/storage';
 import { toast } from '@/store/toast';
 import { useAuthStore } from '@/store/auth';
@@ -34,12 +35,24 @@ export function ProfileForm() {
     }
   }, [profile]);
 
-  function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+  const handleAvatarChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setAvatarPreview((prev) => {
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
     setAvatarFile(file);
-    setAvatarPreview(URL.createObjectURL(file));
-  }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      setAvatarPreview((prev) => {
+        if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+        return prev;
+      });
+    };
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -72,19 +85,13 @@ export function ProfileForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Avatar */}
       <div className="flex items-center gap-4">
-        <button
-          type="button"
+        <Avatar
+          src={avatarPreview}
+          name={displayName || '?'}
+          size="lg"
           onClick={() => fileRef.current?.click()}
-          className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center text-2xl text-slate-400 overflow-hidden hover:opacity-80 transition-opacity shrink-0"
           title="아바타 변경"
-        >
-          {avatarPreview ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatarPreview} alt="avatar" className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-2xl">{displayName.charAt(0).toUpperCase() || '?'}</span>
-          )}
-        </button>
+        />
         <div>
           <button
             type="button"

@@ -158,7 +158,7 @@ export const commentsRouter = router({
   update: protectedProcedure
     .input(z.object({ id: z.string(), content: z.string().min(1).max(3000) }))
     .mutation(async ({ input, ctx }) => {
-      const [comment] = await db.select().from(comments).where(eq(comments.id, input.id)).limit(1);
+      const [comment] = await db.select({ authorId: comments.authorId }).from(comments).where(eq(comments.id, input.id)).limit(1);
       if (!comment) throw new TRPCError({ code: 'NOT_FOUND', message: 'Comment not found' });
       if (comment.authorId !== ctx.userId)
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your comment' });
@@ -178,7 +178,7 @@ export const commentsRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
       const [comment] = await db
-        .select()
+        .select({ authorId: comments.authorId, postId: comments.postId })
         .from(comments)
         .where(eq(comments.id, input.id))
         .limit(1);

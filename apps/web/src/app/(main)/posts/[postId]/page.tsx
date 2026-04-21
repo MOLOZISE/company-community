@@ -10,6 +10,7 @@ import { CommentSection } from '@/components/CommentSection';
 import { ReportButton } from '@/components/ReportButton';
 import { ReactionBar } from '@/components/ReactionBar';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { Avatar } from '@/components/Avatar';
 import { relativeTime } from '@/lib/time';
 import { getFlairStyle, FLAIRS } from '@/lib/flair';
 import { toast } from '@/store/toast';
@@ -70,9 +71,8 @@ export default function PostDetailPage({ params }: { params: Promise<{ postId: s
 
   const isOwner = user?.id === post.authorId;
   const isAnon = post.isAnonymous;
-  const authorLabel = isAnon ? post.anonAlias ?? '익명' : ((post as { authorName?: string | null }).authorName ?? '멤버');
+  const authorLabel = isAnon ? post.anonAlias ?? '익명' : (post.authorName ?? '멤버');
   const flairLabel = FLAIRS.find((f) => f.value === post.flair)?.label;
-  const authorAvatar = (post as { authorAvatar?: string | null }).authorAvatar;
 
   return (
     <article className="bg-white rounded-xl border border-slate-200 p-6">
@@ -89,14 +89,7 @@ export default function PostDetailPage({ params }: { params: Promise<{ postId: s
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 text-sm text-slate-500 mb-2 flex-wrap">
-            <span className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 overflow-hidden shrink-0">
-              {!isAnon && authorAvatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={authorAvatar} alt="" className="w-full h-full object-cover" />
-              ) : (
-                authorLabel.charAt(0).toUpperCase()
-              )}
-            </span>
+            <Avatar src={post.authorAvatar} name={authorLabel} isAnon={!!isAnon} size="md" />
             {isAnon ? (
               <span className="font-medium text-slate-800">{authorLabel}</span>
             ) : (

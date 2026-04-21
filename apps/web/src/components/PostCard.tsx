@@ -7,6 +7,7 @@ import { trpc } from '@/lib/trpc';
 import { relativeTime } from '@/lib/time';
 import { getFlairStyle, FLAIRS } from '@/lib/flair';
 import { ConfirmDialog } from './ConfirmDialog';
+import { Avatar } from './Avatar';
 import { toast } from '@/store/toast';
 
 type Post = {
@@ -63,15 +64,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
           {post.isPinned && <span className="text-blue-500 font-medium">📌</span>}
-          {/* Avatar */}
-          <span className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500 overflow-hidden shrink-0">
-            {!isAnon && post.authorAvatar ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={post.authorAvatar} alt="" className="w-full h-full object-cover" />
-            ) : (
-              authorLabel.charAt(0).toUpperCase()
-            )}
-          </span>
+          <Avatar src={post.authorAvatar} name={authorLabel} isAnon={!!isAnon} size="sm" />
           {isAnon ? (
             <span className="font-medium text-slate-700">{authorLabel}</span>
           ) : (

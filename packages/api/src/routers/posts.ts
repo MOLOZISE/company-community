@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, protectedProcedure } from '../trpc.js';
-import { db, posts, profiles } from '@repo/db';
+import { db, posts, profiles, channels } from '@repo/db';
 import { eq, desc, and, sql, ilike, or, getTableColumns } from 'drizzle-orm';
 
 const postSelect = {
@@ -155,7 +155,7 @@ export const postsRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
       const [post] = await db
-        .select()
+        .select({ authorId: posts.authorId })
         .from(posts)
         .where(eq(posts.id, input.id))
         .limit(1);
@@ -215,7 +215,7 @@ export const postsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const [post] = await db.select().from(posts).where(eq(posts.id, input.id)).limit(1);
+      const [post] = await db.select({ authorId: posts.authorId }).from(posts).where(eq(posts.id, input.id)).limit(1);
       if (!post) throw new TRPCError({ code: 'NOT_FOUND', message: 'Post not found' });
       if (post.authorId !== ctx.userId)
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your post' });
@@ -258,7 +258,6 @@ export const postsRouter = router({
       const [post] = await db.select({ channelId: posts.channelId }).from(posts).where(eq(posts.id, input.id)).limit(1);
       if (!post) throw new TRPCError({ code: 'NOT_FOUND', message: 'Post not found' });
 
-      const { channels } = await import('@repo/db');
       const [channel] = await db.select({ createdBy: channels.createdBy }).from(channels).where(eq(channels.id, post.channelId)).limit(1);
       if (!channel || channel.createdBy !== ctx.userId)
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Channel admin only' });

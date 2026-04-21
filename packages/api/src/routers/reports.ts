@@ -4,6 +4,11 @@ import { router, protectedProcedure } from '../trpc.js';
 import { db, reports, profiles } from '@repo/db';
 import { eq, and, desc } from 'drizzle-orm';
 
+async function assertVerified(userId: string) {
+  const [profile] = await db.select({ isVerified: profiles.isVerified }).from(profiles).where(eq(profiles.id, userId)).limit(1);
+  if (!profile?.isVerified) throw new TRPCError({ code: 'FORBIDDEN', message: 'Verified users only' });
+}
+
 export const reportsRouter = router({
   /**
    * Submit a report on a post or comment
@@ -51,14 +56,12 @@ export const reportsRouter = router({
   getList: protectedProcedure
     .input(z.object({ status: z.enum(['pending', 'resolved', 'dismissed']).optional(), limit: z.number().min(1).max(100).default(50) }))
     .query(async ({ ctx, input }) => {
-      const [profile] = await db.select({ isVerified: profiles.isVerified }).from(profiles).where(eq(profiles.id, ctx.userId)).limit(1);
-      if (!profile?.isVerified) throw new TRPCError({ code: 'FORBIDDEN', message: 'Verified users only' });
+      await assertVerified(ctx.userId);
 
-      const conditions = input.status ? [eq(reports.status, input.status)] : [];
       const rows = await db
         .select()
         .from(reports)
-        .where(conditions.length ? and(...conditions as [typeof conditions[0]]) : undefined)
+        .where(input.status ? eq(reports.status, input.status) : undefined)
         .orderBy(desc(reports.createdAt))
         .limit(input.limit);
       return rows;
@@ -70,9 +73,7 @@ export const reportsRouter = router({
   updateStatus: protectedProcedure
     .input(z.object({ id: z.string(), status: z.enum(['pending', 'resolved', 'dismissed']) }))
     .mutation(async ({ ctx, input }) => {
-      const [profile] = await db.select({ isVerified: profiles.isVerified }).from(profiles).where(eq(profiles.id, ctx.userId)).limit(1);
-      if (!profile?.isVerified) throw new TRPCError({ code: 'FORBIDDEN', message: 'Verified users only' });
-
+      await assertVerified(ctx.userId);
       await db.update(reports).set({ status: input.status }).where(eq(reports.id, input.id));
       return { success: true };
     }),

@@ -5,27 +5,29 @@
    ▲ Next.js 15.5.15
 
    Creating an optimized production build ...
- ✓ Compiled successfully in 2.0s
+ ✓ Compiled successfully in 4.3s
    Skipping linting
    Checking validity of types ...
    Collecting page data ...
-   Generating static pages (0/8) ...
-   Generating static pages (2/8) 
-   Generating static pages (4/8) 
-   Generating static pages (6/8) 
- ✓ Generating static pages (8/8)
+   Generating static pages (0/9) ...
+   Generating static pages (2/9) 
+   Generating static pages (4/9) 
+   Generating static pages (6/9) 
+ ✓ Generating static pages (9/9)
    Finalizing page optimization ...
    Collecting build traces ...
 
 Route (app)                                 Size  First Load JS
-┌ ○ /                                    2.02 kB         108 kB
+┌ ○ /                                    2.13 kB         108 kB
 ├ ○ /_not-found                            989 B         103 kB
+├ ○ /admin/reports                       2.85 kB         125 kB
 ├ ƒ /api/trpc/[trpc]                       123 B         102 kB
-├ ○ /feed                                4.74 kB         184 kB
-├ ○ /login                               1.02 kB         164 kB
-├ ƒ /posts/[postId]                       3.8 kB         122 kB
-├ ○ /profile                             1.09 kB         119 kB
-└ ○ /signup                              1.45 kB         181 kB
+├ ○ /feed                                 3.5 kB         187 kB
+├ ○ /login                               1.09 kB         164 kB
+├ ƒ /posts/[postId]                      7.24 kB         187 kB
+├ ○ /profile                             2.77 kB         186 kB
+├ ○ /signup                              1.53 kB         181 kB
+└ ƒ /users/[userId]                      1.66 kB         123 kB
 + First Load JS shared by all             102 kB
   ├ chunks/495ed1de-ef13b73ea9667117.js  54.2 kB
   ├ chunks/780-ba70085d857d4d82.js         46 kB

@@ -3,6 +3,7 @@
 import { use } from 'react';
 import Link from 'next/link';
 import { trpc } from '@/lib/trpc';
+import { Avatar } from '@/components/Avatar';
 import { relativeTime } from '@/lib/time';
 import { getFlairStyle, FLAIRS } from '@/lib/flair';
 
@@ -28,14 +29,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ userId: 
       {/* Profile card */}
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center text-2xl text-slate-400 shrink-0 overflow-hidden">
-            {profile.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={profile.avatarUrl} alt={profile.displayName} className="w-full h-full object-cover" />
-            ) : (
-              profile.displayName.charAt(0).toUpperCase()
-            )}
-          </div>
+          <Avatar src={profile.avatarUrl} name={profile.displayName} size="lg" />
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold text-slate-900">{profile.displayName}</h1>

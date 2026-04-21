@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { Avatar } from './Avatar';
 import { trpc } from '@/lib/trpc';
 import { useAuthStore } from '@/store/auth';
 import { VoteButton } from './VoteButton';
@@ -79,8 +80,7 @@ function CommentItem({ comment, postId, myVotes, isReply = false }: CommentItemP
   const isOwner = user?.id === comment.authorId;
   const isAnon = comment.isAnonymous;
   const anonLabel = comment.anonNumber === 0 ? '글쓴이' : comment.anonNumber != null ? `익명${comment.anonNumber}` : '익명';
-  const authorLabel = isAnon ? anonLabel : ((comment as { authorName?: string | null }).authorName ?? '멤버');
-  const authorAvatar = (comment as { authorAvatar?: string | null }).authorAvatar;
+  const authorLabel = isAnon ? anonLabel : (comment.authorName ?? '멤버');
 
   function startEdit() {
     setEditText(comment.content);
@@ -104,15 +104,7 @@ function CommentItem({ comment, postId, myVotes, isReply = false }: CommentItemP
 
       <div className="py-3">
         <div className="flex items-center gap-2 mb-1">
-          {/* Avatar */}
-          <span className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500 overflow-hidden shrink-0">
-            {!isAnon && authorAvatar ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={authorAvatar} alt="" className="w-full h-full object-cover" />
-            ) : (
-              authorLabel.charAt(0).toUpperCase()
-            )}
-          </span>
+          <Avatar src={comment.authorAvatar} name={authorLabel} isAnon={!!isAnon} size="sm" />
           {isAnon ? (
             <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
               comment.anonNumber === 0 ? 'bg-teal-50 text-teal-700' : 'bg-slate-100 text-slate-600'
