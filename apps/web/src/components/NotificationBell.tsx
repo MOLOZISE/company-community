@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { trpc } from '@/lib/trpc';
 import { relativeTime } from '@/lib/time';
 
@@ -11,9 +12,17 @@ const TYPE_LABEL: Record<string, string> = {
   mention: '멘션',
 };
 
+function getTargetLink(targetType: string | null, targetId: string | null): string | null {
+  if (!targetId) return null;
+  if (targetType === 'post') return `/posts/${targetId}`;
+  if (targetType === 'comment') return null; // comment targetId alone can't nav without postId
+  return null;
+}
+
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const router = useRouter();
   const utils = trpc.useContext();
 
   const { data: unreadCount = 0 } = trpc.notifications.getUnreadCount.useQuery(undefined, {
@@ -36,7 +45,6 @@ export function NotificationBell() {
     },
   });
 
-  // Close on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
@@ -45,14 +53,19 @@ export function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  function handleOpen() {
-    setOpen((v) => !v);
+  function handleNotificationClick(n: (typeof items)[number]) {
+    if (!n.isRead) markRead.mutate({ id: n.id });
+    const link = getTargetLink(n.targetType, n.targetId);
+    if (link) {
+      setOpen(false);
+      router.push(link);
+    }
   }
 
   return (
     <div ref={ref} className="relative">
       <button
-        onClick={handleOpen}
+        onClick={() => setOpen((v) => !v)}
         className="relative p-1.5 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-100"
         aria-label="알림"
       >
@@ -67,7 +80,7 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
+        <div className="absolute right-0 mt-2 w-[min(320px,calc(100vw-1rem))] bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
             <span className="text-sm font-semibold text-slate-800">알림</span>
             {unreadCount > 0 && (
@@ -84,30 +97,32 @@ export function NotificationBell() {
             {items.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-8">알림이 없습니다</p>
             ) : (
-              items.map((n) => (
-                <div
-                  key={n.id}
-                  onClick={() => {
-                    if (!n.isRead) markRead.mutate({ id: n.id });
-                  }}
-                  className={`px-4 py-3 border-b border-slate-50 cursor-pointer hover:bg-slate-50 transition-colors ${
-                    !n.isRead ? 'bg-indigo-50' : ''
-                  }`}
-                >
-                  <div className="flex items-start gap-2">
-                    {!n.isRead && (
-                      <span className="mt-1.5 w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
-                    )}
-                    <div className={!n.isRead ? '' : 'pl-4'}>
-                      <p className="text-xs font-medium text-indigo-600 mb-0.5">
-                        {TYPE_LABEL[n.type] ?? n.type}
-                      </p>
-                      <p className="text-sm text-slate-700">{n.message}</p>
-                      <p className="text-xs text-slate-400 mt-1">{relativeTime(n.createdAt)}</p>
+              items.map((n) => {
+                const hasLink = !!getTargetLink(n.targetType, n.targetId);
+                return (
+                  <div
+                    key={n.id}
+                    onClick={() => handleNotificationClick(n)}
+                    className={`px-4 py-3 border-b border-slate-50 transition-colors ${
+                      hasLink ? 'cursor-pointer hover:bg-slate-50' : 'cursor-default'
+                    } ${!n.isRead ? 'bg-indigo-50' : ''}`}
+                  >
+                    <div className="flex items-start gap-2">
+                      {!n.isRead && (
+                        <span className="mt-1.5 w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+                      )}
+                      <div className={!n.isRead ? '' : 'pl-4'}>
+                        <p className="text-xs font-medium text-indigo-600 mb-0.5">
+                          {TYPE_LABEL[n.type] ?? n.type}
+                          {hasLink && <span className="ml-1 text-slate-400">→</span>}
+                        </p>
+                        <p className="text-sm text-slate-700">{n.message}</p>
+                        <p className="text-xs text-slate-400 mt-1">{relativeTime(n.createdAt)}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

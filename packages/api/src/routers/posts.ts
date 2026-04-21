@@ -122,6 +122,48 @@ export const postsRouter = router({
     }),
 
   /**
+   * Get all posts by a specific author (non-anonymous only)
+   */
+  getByAuthor: publicProcedure
+    .input(z.object({ authorId: z.string(), limit: z.number().min(1).max(50).default(20), offset: z.number().default(0) }))
+    .query(async ({ input }) => {
+      const items = await db
+        .select()
+        .from(posts)
+        .where(and(eq(posts.authorId, input.authorId), eq(posts.isDeleted, false), eq(posts.isAnonymous, false)))
+        .orderBy(desc(posts.createdAt))
+        .limit(input.limit)
+        .offset(input.offset);
+      return { items, hasMore: items.length === input.limit };
+    }),
+
+  /**
+   * Edit post title/content/flair (author only)
+   */
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        title: z.string().max(300).optional(),
+        content: z.string().min(1).max(10000),
+        flair: z.string().max(100).nullable().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const [post] = await db.select().from(posts).where(eq(posts.id, input.id)).limit(1);
+      if (!post) throw new TRPCError({ code: 'NOT_FOUND', message: 'Post not found' });
+      if (post.authorId !== ctx.userId)
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your post' });
+
+      const [updated] = await db
+        .update(posts)
+        .set({ title: input.title, content: input.content, flair: input.flair ?? null })
+        .where(eq(posts.id, input.id))
+        .returning();
+      return updated;
+    }),
+
+  /**
    * Search posts by title or content
    */
   search: publicProcedure

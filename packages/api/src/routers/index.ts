@@ -6,6 +6,7 @@ import { commentsRouter } from './comments.js';
 import { votesRouter } from './votes.js';
 import { notificationsRouter } from './notifications.js';
 import { reportsRouter } from './reports.js';
+import { reactionsRouter } from './reactions.js';
 
 export const appRouter = router({
   auth: authRouter,
@@ -15,6 +16,7 @@ export const appRouter = router({
   votes: votesRouter,
   notifications: notificationsRouter,
   reports: reportsRouter,
+  reactions: reactionsRouter,
 });
 
 export type AppRouter = typeof appRouter;

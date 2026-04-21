@@ -25,9 +25,7 @@ export function SearchBar() {
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter' && results.length > 0) {
-      handleSelect(results[0].id);
-    }
+    if (e.key === 'Enter' && results.length > 0) handleSelect(results[0].id);
     if (e.key === 'Escape') {
       setFocused(false);
       inputRef.current?.blur();
@@ -49,12 +47,12 @@ export function SearchBar() {
           onBlur={() => setTimeout(() => setFocused(false), 150)}
           onKeyDown={handleKeyDown}
           placeholder="검색..."
-          className="bg-transparent text-sm text-slate-700 placeholder-slate-400 outline-none w-40 md:w-56"
+          className="bg-transparent text-sm text-slate-700 placeholder-slate-400 outline-none w-28 sm:w-44 md:w-56"
         />
       </div>
 
       {showDropdown && (
-        <div className="absolute top-full mt-1 right-0 w-80 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
+        <div className="absolute right-0 top-full mt-1 w-[min(320px,calc(100vw-1rem))] bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
           {results.length === 0 ? (
             <p className="text-sm text-slate-400 text-center py-4">검색 결과 없음</p>
           ) : (

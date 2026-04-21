@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { router, protectedProcedure } from '../trpc.js';
+import { router, publicProcedure, protectedProcedure } from '../trpc.js';
 import { db, profiles } from '@repo/db';
 import { eq } from 'drizzle-orm';
 
@@ -21,6 +21,30 @@ export const authRouter = router({
 
     return profile;
   }),
+
+  /**
+   * Get any user's public profile by ID
+   */
+  getById: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input }) => {
+      const [profile] = await db
+        .select({
+          id: profiles.id,
+          displayName: profiles.displayName,
+          department: profiles.department,
+          jobTitle: profiles.jobTitle,
+          avatarUrl: profiles.avatarUrl,
+          isVerified: profiles.isVerified,
+          createdAt: profiles.createdAt,
+        })
+        .from(profiles)
+        .where(eq(profiles.id, input.id))
+        .limit(1);
+
+      if (!profile) throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+      return profile;
+    }),
 
   /**
    * Create profile after Supabase signup (idempotent)

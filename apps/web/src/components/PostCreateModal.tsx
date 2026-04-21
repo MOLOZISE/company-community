@@ -4,6 +4,11 @@ import { useState } from 'react';
 import { trpc } from '@/lib/trpc';
 import { ImageUpload } from './ImageUpload';
 import { uploadPostImage } from '@/lib/storage';
+import { toast } from '@/store/toast';
+import { FLAIRS } from '@/lib/flair';
+
+const MAX_TITLE = 300;
+const MAX_CONTENT = 10000;
 
 interface PostCreateModalProps {
   onClose: () => void;
@@ -15,6 +20,7 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [channelId, setChannelId] = useState(defaultChannelId ?? '');
+  const [flair, setFlair] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -26,12 +32,7 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
 
   function handleFile(file: File | null) {
     setImageFile(file);
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setImagePreview(url);
-    } else {
-      setImagePreview(null);
-    }
+    setImagePreview(file ? URL.createObjectURL(file) : null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -43,10 +44,8 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
 
     try {
       let mediaUrls: string[] = [];
-
       if (imageFile) {
-        const tempId = crypto.randomUUID();
-        const url = await uploadPostImage(imageFile, tempId);
+        const url = await uploadPostImage(imageFile, crypto.randomUUID());
         mediaUrls = [url];
       }
 
@@ -56,8 +55,10 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
         content: content.trim(),
         isAnonymous,
         mediaUrls,
+        flair: flair || undefined,
       });
 
+      toast.success('게시물이 등록되었습니다.');
       onCreated();
       onClose();
     } catch (err) {
@@ -68,14 +69,14 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6"
+        className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-slate-900">게시물 작성</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl">✕</button>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl" aria-label="닫기">✕</button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
@@ -90,24 +91,52 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
             ))}
           </select>
 
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            maxLength={300}
-            placeholder="제목 (선택)"
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          {/* Flair chips */}
+          <div className="flex flex-wrap gap-1.5">
+            {FLAIRS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => setFlair(flair === f.value ? '' : f.value)}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  flair === f.value
+                    ? f.color + ' border-transparent'
+                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
 
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            maxLength={10000}
-            rows={5}
-            placeholder="내용을 입력하세요..."
-            required
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <div>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value.slice(0, MAX_TITLE))}
+              placeholder="제목 (선택)"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {title.length > MAX_TITLE * 0.8 && (
+              <p className={`text-xs mt-0.5 text-right ${title.length >= MAX_TITLE ? 'text-red-400' : 'text-slate-400'}`}>
+                {title.length}/{MAX_TITLE}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value.slice(0, MAX_CONTENT))}
+              rows={5}
+              placeholder="내용을 입력하세요..."
+              required
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className={`text-xs mt-0.5 text-right ${content.length > MAX_CONTENT * 0.9 ? 'text-red-400' : 'text-slate-400'}`}>
+              {content.length}/{MAX_CONTENT}
+            </p>
+          </div>
 
           <ImageUpload onFile={handleFile} preview={imagePreview} />
 

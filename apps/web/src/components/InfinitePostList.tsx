@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { trpc } from '@/lib/trpc';
 import { PostCard } from './PostCard';
+import { PostCardSkeleton } from './Skeleton';
 import type { AppRouter } from '@repo/api';
 import type { inferRouterOutputs } from '@trpc/server';
 
@@ -96,7 +97,13 @@ export function InfinitePostList({ channelId }: InfinitePostListProps) {
           <PostCard key={post.id} post={post} onDeleted={handleDeleted} />
         ))}
 
-        {isFetching && (
+        {isFetching && allPosts.length === 0 && (
+          <>
+            {Array.from({ length: 4 }).map((_, i) => <PostCardSkeleton key={i} />)}
+          </>
+        )}
+
+        {isFetching && allPosts.length > 0 && (
           <div className="text-center py-4 text-sm text-slate-400">불러오는 중...</div>
         )}
 

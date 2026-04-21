@@ -113,6 +113,25 @@ export const commentsRouter = router({
     }),
 
   /**
+   * Edit comment content (author only)
+   */
+  update: protectedProcedure
+    .input(z.object({ id: z.string(), content: z.string().min(1).max(3000) }))
+    .mutation(async ({ input, ctx }) => {
+      const [comment] = await db.select().from(comments).where(eq(comments.id, input.id)).limit(1);
+      if (!comment) throw new TRPCError({ code: 'NOT_FOUND', message: 'Comment not found' });
+      if (comment.authorId !== ctx.userId)
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your comment' });
+
+      const [updated] = await db
+        .update(comments)
+        .set({ content: input.content })
+        .where(eq(comments.id, input.id))
+        .returning();
+      return updated;
+    }),
+
+  /**
    * Soft delete a comment (owner only)
    */
   delete: protectedProcedure
