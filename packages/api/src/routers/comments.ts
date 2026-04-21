@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, protectedProcedure } from '../trpc.js';
 import { db, comments, posts } from '@repo/db';
-import { eq, and, sql, isNull, desc } from 'drizzle-orm';
+import { eq, and, sql, desc } from 'drizzle-orm';
 
 export const commentsRouter = router({
   /**

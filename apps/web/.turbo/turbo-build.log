@@ -5,9 +5,9 @@
    ▲ Next.js 15.5.15
 
    Creating an optimized production build ...
- ✓ Compiled successfully in 2.5s
-   Linting and checking validity of types ...
- ⨯ ESLint: Invalid Options: - Unknown options: useEslintrc, extensions - 'extensions' has been removed.
+ ✓ Compiled successfully in 2.0s
+   Skipping linting
+   Checking validity of types ...
    Collecting page data ...
    Generating static pages (0/8) ...
    Generating static pages (2/8) 
@@ -23,7 +23,7 @@ Route (app)                                 Size  First Load JS
 ├ ƒ /api/trpc/[trpc]                       123 B         102 kB
 ├ ○ /feed                                4.74 kB         184 kB
 ├ ○ /login                               1.02 kB         164 kB
-├ ƒ /posts/[postId]                      2.41 kB         121 kB
+├ ƒ /posts/[postId]                       3.8 kB         122 kB
 ├ ○ /profile                             1.09 kB         119 kB
 └ ○ /signup                              1.45 kB         181 kB
 + First Load JS shared by all             102 kB

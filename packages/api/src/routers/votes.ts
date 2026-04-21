@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure } from '../trpc.js';
 import { db, votes, posts, comments } from '@repo/db';
 import { eq, and, sql } from 'drizzle-orm';
