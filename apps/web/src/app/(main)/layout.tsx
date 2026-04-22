@@ -8,11 +8,13 @@ import { useAuthStore } from '@/store/auth';
 import { Sidebar } from '@/components/Sidebar';
 import { NotificationBell } from '@/components/NotificationBell';
 import { SearchBar } from '@/components/SearchBar';
+import { usePresence } from '@/hooks/usePresence';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, isLoading } = useAuthStore();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const onlineUserIds = usePresence(user?.id);
 
   useEffect(() => {
     if (!isLoading && !user) router.replace('/login');
@@ -94,7 +96,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               </button>
             </div>
             <div className="p-3">
-              <Sidebar onNavigate={() => setDrawerOpen(false)} />
+              <Sidebar onNavigate={() => setDrawerOpen(false)} onlineUserCount={onlineUserIds.length} />
             </div>
           </div>
         </>
@@ -102,7 +104,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
       <div className="mx-auto flex max-w-6xl gap-6 px-4 py-6">
         <div className="hidden md:block">
-          <Sidebar />
+          <Sidebar onlineUserCount={onlineUserIds.length} />
         </div>
         <main className="min-w-0 flex-1">{children}</main>
       </div>

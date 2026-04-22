@@ -1,13 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { trpc } from '@/lib/trpc';
 import { relativeTime } from '@/lib/time';
 import { getFlairStyle, FLAIRS } from '@/lib/flair';
 import { ConfirmDialog } from './ConfirmDialog';
 import { Avatar } from './Avatar';
+import { PollCard } from './PollCard';
+import { HashtagText } from './HashtagText';
 import { toast } from '@/store/toast';
 
 type Post = {
@@ -26,6 +29,7 @@ type Post = {
   viewCount: number | null;
   mediaUrls: string[] | null;
   flair: string | null;
+  kind: string | null;
   isPinned: boolean | null;
   createdAt: Date | string | null;
 };
@@ -33,21 +37,56 @@ type Post = {
 interface PostCardProps {
   post: Post;
   onDeleted?: () => void;
+  isSaved?: boolean;
 }
 
-export function PostCard({ post, onDeleted }: PostCardProps) {
+export function PostCard({ post, onDeleted, isSaved: isSavedProp }: PostCardProps) {
   const { user } = useAuthStore();
+  const router = useRouter();
+  const utils = trpc.useContext();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [localSaved, setLocalSaved] = useState<boolean | null>(null);
+
   const deletePost = trpc.posts.delete.useMutation({
     onSuccess: () => {
-      toast.success('게시물이 삭제되었습니다.');
+      toast.success('게시글을 삭제했어요.');
       onDeleted?.();
+    },
+  });
+
+  const savedFromQuery = trpc.saves.getIsSavedMap.useQuery(
+    { postIds: [post.id] },
+    { enabled: !!user && isSavedProp === undefined }
+  ).data?.[post.id] ?? false;
+
+  const displayedSaved = localSaved ?? isSavedProp ?? savedFromQuery;
+
+  useEffect(() => {
+    setLocalSaved(null);
+  }, [isSavedProp, savedFromQuery]);
+
+  const toggleSaved = trpc.saves.toggle.useMutation({
+    onMutate: async () => {
+      if (!user) return { previous: displayedSaved };
+      const next = !displayedSaved;
+      setLocalSaved(next);
+      return { previous: displayedSaved };
+    },
+    onSuccess: (result) => {
+      setLocalSaved(null);
+      toast.success(result.saved ? '북마크에 저장했어요.' : '북마크를 해제했어요.');
+      utils.saves.getIsSavedMap.invalidate();
+      utils.saves.getMySaves.invalidate();
+    },
+    onError: (_error, _input, context) => {
+      setLocalSaved(context?.previous ?? null);
+      toast.error('북마크 처리에 실패했어요.');
     },
   });
 
   const isOwner = user?.id === post.authorId;
   const isAnon = post.isAnonymous;
-  const authorLabel = isAnon ? post.anonAlias ?? '익명 동료' : post.authorName ?? '멤버';
+  const authorLabel = isAnon ? post.anonAlias ?? '익명' : post.authorName ?? '멤버';
   const firstImage = post.mediaUrls?.[0];
   const flairLabel = FLAIRS.find((f) => f.value === post.flair)?.label;
 
@@ -59,8 +98,8 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
     >
       <ConfirmDialog
         open={confirmDelete}
-        title="게시물을 삭제할까요?"
-        description="삭제한 게시물은 되돌릴 수 없습니다."
+        title="게시글을 삭제할까요?"
+        description="삭제한 게시글은 복구할 수 없어요."
         confirmLabel="삭제"
         destructive
         onConfirm={() => {
@@ -105,34 +144,64 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
           </div>
         </div>
 
-        {isOwner && (
+        <div className="flex shrink-0 items-center gap-1">
           <button
-            onClick={() => setConfirmDelete(true)}
-            className="shrink-0 rounded-md px-2 py-1 text-xs text-slate-400 hover:bg-red-50 hover:text-red-600"
+            onClick={() => {
+              if (!user) {
+                router.push('/login');
+                return;
+              }
+              toggleSaved.mutate({ postId: post.id });
+            }}
+            disabled={toggleSaved.isLoading}
+            aria-pressed={displayedSaved}
+            className={`rounded-full px-2.5 py-1 text-xs font-medium ring-1 transition-colors ${
+              displayedSaved
+                ? 'bg-amber-50 text-amber-700 ring-amber-100 hover:bg-amber-100'
+                : 'bg-slate-50 text-slate-500 ring-slate-200 hover:bg-slate-100'
+            }`}
           >
-            삭제
+            {displayedSaved ? '저장됨' : '저장'}
           </button>
+
+          {isOwner && (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="shrink-0 rounded-md px-2 py-1 text-xs text-slate-400 hover:bg-red-50 hover:text-red-600"
+            >
+              삭제
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="group block">
+        {post.title && (
+          <Link href={`/posts/${post.id}`} className="block">
+            <h3 className="mb-1 text-base font-semibold leading-6 text-slate-950 group-hover:text-blue-600">
+              {post.title}
+            </h3>
+          </Link>
+        )}
+        <HashtagText
+          text={post.content}
+          className="block line-clamp-3 whitespace-pre-wrap text-sm leading-6 text-slate-600"
+        />
+
+        {firstImage && (
+          <Link href={`/posts/${post.id}`} className="block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={firstImage}
+              alt=""
+              loading="lazy"
+              className="mt-3 aspect-[16/9] max-h-64 w-full rounded-lg object-cover"
+            />
+          </Link>
         )}
       </div>
 
-      <Link href={`/posts/${post.id}`} className="block group">
-        {post.title && (
-          <h3 className="mb-1 text-base font-semibold leading-6 text-slate-950 group-hover:text-blue-600">
-            {post.title}
-          </h3>
-        )}
-        <p className="text-sm leading-6 text-slate-600 line-clamp-3">{post.content}</p>
-
-        {firstImage && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={firstImage}
-            alt=""
-            loading="lazy"
-            className="mt-3 aspect-[16/9] max-h-64 w-full rounded-lg object-cover"
-          />
-        )}
-      </Link>
+      {post.kind === 'poll' && <PollCard postId={post.id} />}
 
       <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-500">
         <Metric label="추천" value={post.upvoteCount ?? 0} />

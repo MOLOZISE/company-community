@@ -9,6 +9,7 @@ import { useAuthStore } from '@/store/auth';
 
 interface SidebarProps {
   onNavigate?: () => void;
+  onlineUserCount?: number;
 }
 
 type ChannelItem = {
@@ -22,7 +23,7 @@ type ChannelItem = {
   displayOrder: number | null;
 };
 
-export function Sidebar({ onNavigate }: SidebarProps = {}) {
+export function Sidebar({ onNavigate, onlineUserCount = 0 }: SidebarProps = {}) {
   const pathname = usePathname();
   const [showRequestModal, setShowRequestModal] = useState(false);
   const { user } = useAuthStore();
@@ -173,6 +174,9 @@ export function Sidebar({ onNavigate }: SidebarProps = {}) {
           <NavLink href="/feed" active={pathname === '/feed'} onClick={onNavigate} muted>
             📰 모아보기
           </NavLink>
+          <div className="px-3 pb-2 pt-1 text-xs text-slate-400">
+            지금 활동 중 {onlineUserCount.toLocaleString()}명
+          </div>
         </div>
 
         <button

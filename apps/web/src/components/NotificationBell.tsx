@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { trpc } from '@/lib/trpc';
 import { relativeTime } from '@/lib/time';
 import { useAuthStore } from '@/store/auth';
+import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
 
 const TYPE_LABEL: Record<string, string> = {
   comment: '댓글',
@@ -31,6 +32,7 @@ export function NotificationBell() {
   const router = useRouter();
   const utils = trpc.useContext();
   const { user } = useAuthStore();
+  useRealtimeNotifications(user?.id);
 
   const { data: unreadCount = 0 } = trpc.notifications.getUnreadCount.useQuery(undefined, {
     enabled: !!user,

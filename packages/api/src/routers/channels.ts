@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, protectedProcedure, assertAdmin } from '../trpc.js';
 import { db, channels, channelMembers, channelRequests, profiles } from '@repo/db';
-import { eq, desc, and, sql, ilike, or, asc } from 'drizzle-orm';
+import { eq, desc, and, sql, ilike, or, asc, notInArray } from 'drizzle-orm';
 
 function normalizeSlug(value: string) {
   return value
@@ -12,6 +12,14 @@ function normalizeSlug(value: string) {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 100);
+}
+
+function splitDepartment(value: string) {
+  return value
+    .split(/[\s,\/|·]+/g)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .slice(0, 4);
 }
 
 export const channelsRouter = router({
@@ -356,6 +364,93 @@ export const channelsRouter = router({
       .where(eq(channelMembers.userId, ctx.userId));
     return memberships.map((m) => m.channelId);
   }),
+
+  /**
+   * Recommend onboarding channels for a new member.
+   */
+  getRecommended: protectedProcedure
+    .input(z.object({ limit: z.number().min(1).max(10).default(3) }).optional())
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 3;
+
+      const [profile] = await db
+        .select({ department: profiles.department, createdAt: profiles.createdAt })
+        .from(profiles)
+        .where(eq(profiles.id, ctx.userId))
+        .limit(1);
+
+      const joined = await db
+        .select({ channelId: channelMembers.channelId })
+        .from(channelMembers)
+        .where(eq(channelMembers.userId, ctx.userId));
+
+      const joinedIds = joined.map((row) => row.channelId);
+      const department = profile?.department?.trim() ?? '';
+      const departmentTokens = department ? splitDepartment(department) : [];
+
+      const baseWhere = and(eq(channels.isListed, true), eq(channels.membershipType, 'open'));
+      const openQuery = db
+        .select({
+          id: channels.id,
+          slug: channels.slug,
+          name: channels.name,
+          description: channels.description,
+          memberCount: channels.memberCount,
+          iconUrl: channels.iconUrl,
+        })
+        .from(channels)
+        .where(
+          and(
+            baseWhere,
+            joinedIds.length > 0 ? notInArray(channels.id, joinedIds) : undefined
+          )
+        )
+        .orderBy(desc(channels.memberCount), asc(channels.displayOrder))
+        .limit(limit);
+
+      const departmentQuery = departmentTokens.length
+        ? db
+            .select({
+              id: channels.id,
+              slug: channels.slug,
+              name: channels.name,
+              description: channels.description,
+              memberCount: channels.memberCount,
+              iconUrl: channels.iconUrl,
+            })
+            .from(channels)
+            .where(
+              and(
+                eq(channels.isListed, true),
+                joinedIds.length > 0 ? notInArray(channels.id, joinedIds) : undefined,
+                or(
+                  eq(channels.scope, 'department'),
+                  ...departmentTokens.flatMap((token) => [
+                    ilike(channels.name, `%${token}%`),
+                    ilike(channels.description, `%${token}%`),
+                  ])
+                )
+              )
+            )
+            .orderBy(desc(channels.memberCount), asc(channels.displayOrder))
+            .limit(limit)
+        : null;
+
+      const departmentRows = departmentQuery ? await departmentQuery : [];
+      if (departmentRows.length >= limit || !departmentQuery) {
+        return departmentRows.slice(0, limit);
+      }
+
+      const fallbackRows = await openQuery;
+      const seen = new Set(departmentRows.map((row) => row.id));
+      for (const row of fallbackRows) {
+        if (seen.has(row.id)) continue;
+        departmentRows.push(row);
+        if (departmentRows.length >= limit) break;
+      }
+
+      return departmentRows;
+    }),
 
   /**
    * Search channels by name or description

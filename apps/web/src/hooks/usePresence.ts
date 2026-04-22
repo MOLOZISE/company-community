@@ -1,0 +1,53 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+
+type PresencePayload = {
+  userId?: string;
+};
+
+/**
+ * Track online users in the shared `online-users` presence channel.
+ */
+export function usePresence(userId?: string | null) {
+  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!userId) {
+      setOnlineUserIds([]);
+      return;
+    }
+
+    const channel = supabase.channel('online-users', {
+      config: {
+        presence: { key: userId },
+      },
+    });
+
+    const syncPresence = () => {
+      const state = channel.presenceState<PresencePayload>();
+      const ids = Object.values(state)
+        .flat()
+        .map((presence) => presence.userId)
+        .filter((value): value is string => Boolean(value));
+      setOnlineUserIds(Array.from(new Set(ids)));
+    };
+
+    channel.on('presence', { event: 'sync' }, syncPresence);
+
+    void channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await channel.track({ userId });
+        syncPresence();
+      }
+    });
+
+    return () => {
+      void channel.untrack();
+      void supabase.removeChannel(channel);
+    };
+  }, [userId]);
+
+  return onlineUserIds;
+}

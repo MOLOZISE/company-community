@@ -11,12 +11,15 @@ import { ReportButton } from '@/components/ReportButton';
 import { ReactionBar } from '@/components/ReactionBar';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Avatar } from '@/components/Avatar';
+import { PollCard } from '@/components/PollCard';
+import { HashtagText } from '@/components/HashtagText';
 import { relativeTime } from '@/lib/time';
 import { getFlairStyle, FLAIRS } from '@/lib/flair';
 import { toast } from '@/store/toast';
 
 const MAX_TITLE = 300;
 const MAX_CONTENT = 10000;
+const SUMMARY_THRESHOLD = 500;
 
 export default function PostDetailPage({ params }: { params: Promise<{ postId: string }> }) {
   const { postId } = use(params);
@@ -47,11 +50,46 @@ export default function PostDetailPage({ params }: { params: Promise<{ postId: s
   const [editContent, setEditContent] = useState('');
   const [editFlair, setEditFlair] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [summaryAvailable, setSummaryAvailable] = useState(false);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summary, setSummary] = useState('');
+  const [summaryError, setSummaryError] = useState('');
 
   useEffect(() => {
     if (postId) incrementView.mutate({ id: postId });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkSummaryAvailability() {
+      if (!post || post.content.length < SUMMARY_THRESHOLD) {
+        setSummaryAvailable(false);
+        setSummary('');
+        setSummaryError('');
+        setSummaryLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/summarize');
+        const data = (await response.json()) as { available?: boolean };
+        if (!cancelled) {
+          setSummaryAvailable(Boolean(data.available));
+        }
+      } catch {
+        if (!cancelled) {
+          setSummaryAvailable(false);
+        }
+      }
+    }
+
+    void checkSummaryAvailability();
+    return () => {
+      cancelled = true;
+    };
+  }, [post]);
 
   function startEdit() {
     if (!post) return;
@@ -59,6 +97,31 @@ export default function PostDetailPage({ params }: { params: Promise<{ postId: s
     setEditContent(post.content);
     setEditFlair(post.flair ?? '');
     setEditing(true);
+  }
+
+  async function handleSummarize() {
+    if (!post || summaryLoading || summary) return;
+    setSummaryLoading(true);
+    setSummaryError('');
+
+    try {
+      const response = await fetch('/api/summarize', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ postId: post.id }),
+      });
+      const data = (await response.json()) as { summary?: string; error?: string };
+
+      if (!response.ok) {
+        throw new Error(data.error || '요약 생성에 실패했습니다.');
+      }
+
+      setSummary(data.summary ?? '');
+    } catch (error) {
+      setSummaryError(error instanceof Error ? error.message : '요약 생성에 실패했습니다.');
+    } finally {
+      setSummaryLoading(false);
+    }
   }
 
   if (isLoading) {
@@ -173,8 +236,48 @@ export default function PostDetailPage({ params }: { params: Promise<{ postId: s
           </div>
         </div>
       ) : (
-        <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{post.content}</p>
+        <HashtagText
+          text={post.content}
+          className="block whitespace-pre-wrap leading-relaxed text-slate-700"
+        />
       )}
+
+      {!editing && summaryAvailable && post.content.length >= SUMMARY_THRESHOLD && (
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">AI Summary</p>
+              <h2 className="mt-1 text-sm font-semibold text-slate-900">3줄 요약</h2>
+            </div>
+            <button
+              type="button"
+              onClick={handleSummarize}
+              disabled={summaryLoading}
+              className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              {summary ? '다시 요약' : summaryLoading ? '요약 중...' : '3줄 요약'}
+            </button>
+          </div>
+
+          <div className="mt-3 min-h-20 rounded-lg bg-white p-4 text-sm leading-6 text-slate-700">
+            {summaryLoading ? (
+              <div className="space-y-2">
+                <div className="h-3 w-11/12 animate-pulse rounded bg-slate-200" />
+                <div className="h-3 w-5/6 animate-pulse rounded bg-slate-200" />
+                <div className="h-3 w-4/6 animate-pulse rounded bg-slate-200" />
+              </div>
+            ) : summary ? (
+              <p className="whitespace-pre-wrap">{summary}</p>
+            ) : summaryError ? (
+              <p className="text-sm text-red-600">{summaryError}</p>
+            ) : (
+              <p className="text-slate-500">게시글을 빠르게 읽을 수 있도록 핵심만 요약해 드려요.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {!editing && post.kind === 'poll' && <PollCard postId={post.id} />}
 
       {!editing && post.mediaUrls && post.mediaUrls.length > 0 && (
         <div className="mt-4 space-y-2">

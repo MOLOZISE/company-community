@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, protectedProcedure } from '../trpc.js';
-import { db, posts, profiles, channels } from '@repo/db';
+import { db, posts, profiles, channels, pollOptions, postTags } from '@repo/db';
 import { eq, desc, and, sql, ilike, or, getTableColumns } from 'drizzle-orm';
+import { normalizePollOptions } from './polls.js';
 
 const postSelect = {
   ...getTableColumns(posts),
@@ -49,6 +50,35 @@ function generateDeterministicAlias(anonymousSeed: string, postId: string): stri
   return `익명 ${animal}${num}`;
 }
 
+const HASHTAG_PATTERN = /#([\p{L}\p{N}_]+)/gu;
+
+function normalizeTag(tag: string): string {
+  return tag.trim().replace(/^#/, '').toLowerCase();
+}
+
+function extractPostTags(content: string): string[] {
+  const tags = new Set<string>();
+  for (const match of content.matchAll(HASHTAG_PATTERN)) {
+    const tag = normalizeTag(match[1] ?? '');
+    if (tag) tags.add(tag);
+  }
+  return [...tags];
+}
+
+async function syncPostTags(tx: typeof db, postId: string, content: string) {
+  const tags = extractPostTags(content);
+  await tx.delete(postTags).where(eq(postTags.postId, postId));
+  if (tags.length === 0) return;
+
+  await tx.insert(postTags).values(tags.map((tag) => ({ postId, tag })));
+}
+
+function getOrderColumn(sort: 'hot' | 'new' | 'top') {
+  if (sort === 'new') return desc(posts.createdAt);
+  if (sort === 'top') return desc(posts.upvoteCount);
+  return desc(posts.hotScore);
+}
+
 export const postsRouter = router({
   /**
    * Get paginated feed with sorting options
@@ -90,6 +120,38 @@ export const postsRouter = router({
     }),
 
   /**
+   * Get posts for a specific hashtag.
+   */
+  getByTag: publicProcedure
+    .input(
+      z.object({
+        tag: z.string().min(1).max(100),
+        sort: z.enum(['hot', 'new', 'top']).default('hot'),
+        limit: z.number().min(1).max(50).default(20),
+        offset: z.number().min(0).default(0),
+      })
+    )
+    .query(async ({ input }) => {
+      const tag = normalizeTag(input.tag);
+      if (!tag) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Tag is required' });
+      }
+
+      const items = await db
+        .select(postSelect)
+        .from(posts)
+        .innerJoin(postTags, eq(posts.id, postTags.postId))
+        .leftJoin(profiles, eq(posts.authorId, profiles.id))
+        .leftJoin(channels, eq(posts.channelId, channels.id))
+        .where(and(eq(posts.isDeleted, false), eq(postTags.tag, tag)))
+        .orderBy(getOrderColumn(input.sort))
+        .limit(input.limit)
+        .offset(input.offset);
+
+      return { items, hasMore: items.length === input.limit };
+    }),
+
+  /**
    * Get single post by ID
    */
   getById: publicProcedure
@@ -119,16 +181,27 @@ export const postsRouter = router({
         channelId: z.string(),
         title: z.string().max(300).optional(),
         content: z.string().min(1).max(10000),
+        kind: z.enum(['text', 'poll']).default('text'),
+        pollOptions: z.array(z.string().min(1).max(200)).max(5).optional(),
         isAnonymous: z.boolean().default(false),
         mediaUrls: z.array(z.string()).max(10).default([]),
         flair: z.string().max(100).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const kind = input.kind ?? 'text';
+      const postId = crypto.randomUUID();
+
+      const pollLabels = kind === 'poll' ? normalizePollOptions(input.pollOptions ?? []) : [];
+      if (kind === 'poll') {
+        if (pollLabels.length < 2 || pollLabels.length > 5) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Poll options must be between 2 and 5 items' });
+        }
+      }
+
       return db.transaction(async (tx) => {
         let anonAlias: string | null = null;
         if (input.isAnonymous) {
-          const postId = crypto.randomUUID();
           const [profile] = await tx
             .select({ anonymousSeed: profiles.anonymousSeed })
             .from(profiles)
@@ -144,12 +217,25 @@ export const postsRouter = router({
               authorId: ctx.userId,
               title: input.title,
               content: input.content,
+              kind,
               isAnonymous: true,
               anonAlias,
               mediaUrls: input.mediaUrls,
               flair: input.flair,
             })
             .returning();
+
+          await syncPostTags(tx, postId, input.content);
+
+          if (kind === 'poll') {
+            await tx.insert(pollOptions).values(
+              pollLabels.map((label, index) => ({
+                postId,
+                label,
+                orderIdx: index,
+              }))
+            );
+          }
 
           await tx
             .update(channels)
@@ -162,16 +248,30 @@ export const postsRouter = router({
         const [post] = await tx
           .insert(posts)
           .values({
+            id: postId,
             channelId: input.channelId,
             authorId: ctx.userId,
             title: input.title,
             content: input.content,
+            kind,
             isAnonymous: false,
             anonAlias: null,
             mediaUrls: input.mediaUrls,
             flair: input.flair,
           })
           .returning();
+
+        await syncPostTags(tx, postId, input.content);
+
+        if (kind === 'poll') {
+          await tx.insert(pollOptions).values(
+            pollLabels.map((label, index) => ({
+              postId,
+              label,
+              orderIdx: index,
+            }))
+          );
+        }
 
         await tx
           .update(channels)
@@ -274,22 +374,26 @@ export const postsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const [post] = await db
-        .select({ authorId: posts.authorId })
-        .from(posts)
-        .where(eq(posts.id, input.id))
-        .limit(1);
-      if (!post) throw new TRPCError({ code: 'NOT_FOUND', message: 'Post not found' });
-      if (post.authorId !== ctx.userId) {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your post' });
-      }
+      return db.transaction(async (tx) => {
+        const [post] = await tx
+          .select({ authorId: posts.authorId })
+          .from(posts)
+          .where(eq(posts.id, input.id))
+          .limit(1);
+        if (!post) throw new TRPCError({ code: 'NOT_FOUND', message: 'Post not found' });
+        if (post.authorId !== ctx.userId) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your post' });
+        }
 
-      const [updated] = await db
-        .update(posts)
-        .set({ title: input.title, content: input.content, flair: input.flair ?? undefined })
-        .where(eq(posts.id, input.id))
-        .returning();
-      return updated;
+        const [updated] = await tx
+          .update(posts)
+          .set({ title: input.title, content: input.content, flair: input.flair ?? undefined })
+          .where(eq(posts.id, input.id))
+          .returning();
+
+        await syncPostTags(tx, input.id, input.content);
+        return updated;
+      });
     }),
 
   /**

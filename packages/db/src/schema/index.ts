@@ -8,6 +8,7 @@ import {
   varchar,
   uniqueIndex,
   index,
+  primaryKey,
   numeric,
   jsonb,
   check,
@@ -130,6 +131,7 @@ export const posts = pgTable(
     title: varchar('title', { length: 300 }),
     content: text('content').notNull(),
     contentType: varchar('content_type', { length: 50 }).default('text'),
+    kind: varchar('kind', { length: 20 }).notNull().default('text'),
     mediaUrls: text('media_urls').array().default([]),
     linkUrl: text('link_url'),
     linkPreview: jsonb('link_preview'),
@@ -150,6 +152,94 @@ export const posts = pgTable(
       authorIdIdx: index('idx_posts_author_id').on(table.authorId),
       createdAtIdx: index('idx_posts_created_at').on(table.createdAt),
       hotScoreIdx: index('idx_posts_hot_score').on(table.hotScore),
+    };
+  }
+);
+
+// ============================================
+// Saves / Bookmarks
+// ============================================
+export const saves = pgTable(
+  'saves',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    postId: uuid('post_id')
+      .notNull()
+      .references(() => posts.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => {
+    return {
+      uniqueSaveIdx: uniqueIndex('idx_saves_unique').on(table.userId, table.postId),
+      userCreatedAtIdx: index('idx_saves_user_created_at').on(table.userId, table.createdAt),
+      postIdx: index('idx_saves_post_id').on(table.postId),
+    };
+  }
+);
+
+// ============================================
+// Post Tags
+// ============================================
+export const postTags = pgTable(
+  'post_tags',
+  {
+    postId: uuid('post_id')
+      .notNull()
+      .references(() => posts.id, { onDelete: 'cascade' }),
+    tag: text('tag').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => {
+    return {
+      pk: primaryKey({ columns: [table.postId, table.tag] }),
+      tagCreatedAtIdx: index('idx_post_tags_tag_created_at').on(table.tag, table.createdAt),
+      postIdx: index('idx_post_tags_post_id').on(table.postId),
+    };
+  }
+);
+
+// ============================================
+// Polls
+// ============================================
+export const pollOptions = pgTable(
+  'poll_options',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    postId: uuid('post_id')
+      .notNull()
+      .references(() => posts.id, { onDelete: 'cascade' }),
+    label: text('label').notNull(),
+    orderIdx: integer('order_idx').notNull(),
+  },
+  (table) => {
+    return {
+      postOrderIdx: uniqueIndex('idx_poll_options_post_order').on(table.postId, table.orderIdx),
+      postIdx: index('idx_poll_options_post_id').on(table.postId),
+    };
+  }
+);
+
+export const pollVotes = pgTable(
+  'poll_votes',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    postId: uuid('post_id')
+      .notNull()
+      .references(() => posts.id, { onDelete: 'cascade' }),
+    pollOptionId: uuid('poll_option_id')
+      .notNull()
+      .references(() => pollOptions.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => {
+    return {
+      uniqueVoteIdx: uniqueIndex('idx_poll_votes_unique').on(table.userId, table.postId),
+      postIdx: index('idx_poll_votes_post_id').on(table.postId),
+      optionIdx: index('idx_poll_votes_option_id').on(table.pollOptionId),
     };
   }
 );

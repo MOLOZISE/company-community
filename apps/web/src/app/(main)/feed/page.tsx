@@ -5,6 +5,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { InfinitePostList } from '@/components/InfinitePostList';
 import { PostCreateModal } from '@/components/PostCreateModal';
 import { FlairChips } from '@/components/FlairChips';
+import { CommunityStatsCard } from '@/components/CommunityStatsCard';
+import { TrendingTopicsCard } from '@/components/TrendingTopicsCard';
+import { ActiveChannelsCard } from '@/components/ActiveChannelsCard';
+import { OnboardingCard } from '@/components/OnboardingCard';
 import { trpc } from '@/lib/trpc';
 import { useAuthStore } from '@/store/auth';
 
@@ -24,8 +28,12 @@ export default function FeedPage() {
   const join = trpc.channels.join.useMutation({ onSuccess: () => refetchMemberships() });
   const leave = trpc.channels.leave.useMutation({ onSuccess: () => refetchMemberships() });
 
+  const { data: communityStats } = trpc.trending.getCommunityStats.useQuery();
+  const { data: trendingTopics } = trpc.trending.getTrendingTopics.useQuery();
+  const { data: activeChannels } = trpc.trending.getActiveChannels.useQuery();
+
   const activeChannel = useMemo(
-    () => channelsData?.items.find((ch) => ch.id === channelId),
+    () => channelsData?.items.find((channel) => channel.id === channelId),
     [channelsData?.items, channelId]
   );
 
@@ -33,7 +41,7 @@ export default function FeedPage() {
   const isMember = channelId ? myChannelIds?.includes(channelId) : false;
 
   function handleCreated() {
-    setFeedKey((k) => k + 1);
+    setFeedKey((key) => key + 1);
   }
 
   function handleFlairChange(flair: string | undefined) {
@@ -47,42 +55,62 @@ export default function FeedPage() {
     router.push(query ? `/feed?${query}` : '/feed');
   }
 
-  // No channel: "모아보기" aggregate view
+  const sidebar = (
+    <aside className="hidden xl:block xl:w-80 xl:shrink-0">
+      <div className="sticky top-6 space-y-4">
+        <CommunityStatsCard stats={communityStats} />
+        <TrendingTopicsCard topics={trendingTopics} />
+        <ActiveChannelsCard channels={activeChannels} />
+      </div>
+    </aside>
+  );
+
+  function FeedShell({ children }: { children: React.ReactNode }) {
+    return (
+      <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-6">
+        <div className="min-w-0 space-y-5">{children}</div>
+        {sidebar}
+      </div>
+    );
+  }
+
   if (!activeChannel && !channelId) {
     return (
-      <div className="space-y-5">
+      <FeedShell>
+        <OnboardingCard />
+
         <section className="rounded-lg border border-slate-200 bg-white p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">모아보기</p>
-              <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">전체 글 모아보기</h1>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">전체 피드</p>
+              <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">회사 커뮤니티 피드</h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                구독 중인 게시판과 공간의 최신 글을 한곳에서 확인합니다.
+                지금 가장 많이 올라오는 글과 채널 활동을 한눈에 볼 수 있습니다.
               </p>
             </div>
             <button
               onClick={() => setShowModal(true)}
               className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
             >
-              새 글 작성
+              글 작성
             </button>
           </div>
         </section>
+
         <section className="rounded-lg border border-slate-200 bg-white p-4">
           <FlairChips activeFlair={activeFlair} onChange={handleFlairChange} />
         </section>
+
         <InfinitePostList key={feedKey} flair={activeFlair} onStartPost={() => setShowModal(true)} />
-        {showModal && (
-          <PostCreateModal onClose={() => setShowModal(false)} onCreated={handleCreated} />
-        )}
-      </div>
+
+        {showModal && <PostCreateModal onClose={() => setShowModal(false)} onCreated={handleCreated} />}
+      </FeedShell>
     );
   }
 
-  // Space channel: purpose-driven, member-oriented
   if (isSpace) {
     return (
-      <div className="space-y-5">
+      <FeedShell>
         <section className="rounded-lg border border-indigo-100 bg-indigo-50 p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
@@ -91,9 +119,7 @@ export default function FeedPage() {
                 {activeChannel?.name ?? '공간'}
               </h1>
               {activeChannel?.description && (
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                  {activeChannel.description}
-                </p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{activeChannel.description}</p>
               )}
               <div className="mt-3 flex items-center gap-3 text-xs text-indigo-600">
                 <span>{(activeChannel?.memberCount ?? 0).toLocaleString()}명 참여 중</span>
@@ -101,6 +127,7 @@ export default function FeedPage() {
                 <span>{(activeChannel?.postCount ?? 0).toLocaleString()}개 글</span>
               </div>
             </div>
+
             <div className="flex shrink-0 flex-col gap-2 sm:items-end">
               {isMember ? (
                 <>
@@ -108,7 +135,7 @@ export default function FeedPage() {
                     onClick={() => setShowModal(true)}
                     className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
                   >
-                    새 글 작성
+                    글 작성
                   </button>
                   <button
                     onClick={() => channelId && leave.mutate({ channelId })}
@@ -147,28 +174,28 @@ export default function FeedPage() {
             defaultChannelId={channelId}
           />
         )}
-      </div>
+      </FeedShell>
     );
   }
 
-  // Board channel (default): strong category identity, public discussion
   return (
-    <div className="space-y-5">
+    <FeedShell>
       <section className="rounded-lg border border-slate-200 bg-white p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">
-              {activeChannel ? '게시판' : '모아보기'}
+              {activeChannel ? '게시판' : '전체 피드'}
             </p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
-              {activeChannel?.name ?? '전체 글 모아보기'}
+              {activeChannel?.name ?? '회사 커뮤니티 피드'}
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-              {activeChannel?.description ?? '게시판을 찾을 수 없습니다.'}
+              {activeChannel?.description ?? '게시판별 최신 글을 확인할 수 있습니다.'}
             </p>
             {activeChannel && (
               <div className="mt-2 text-xs text-slate-400">
-                {(activeChannel.memberCount ?? 0).toLocaleString()}명 · {(activeChannel.postCount ?? 0).toLocaleString()}개 글
+                {(activeChannel.memberCount ?? 0).toLocaleString()}명 · {(activeChannel.postCount ?? 0).toLocaleString()}
+                개 글
               </div>
             )}
           </div>
@@ -176,7 +203,7 @@ export default function FeedPage() {
             onClick={() => setShowModal(true)}
             className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
           >
-            새 글 작성
+            글 작성
           </button>
         </div>
       </section>
@@ -199,6 +226,6 @@ export default function FeedPage() {
           defaultChannelId={channelId}
         />
       )}
-    </div>
+    </FeedShell>
   );
 }

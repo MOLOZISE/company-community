@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { trpc } from '@/lib/trpc';
 import { PostCard } from './PostCard';
 import { PostCardSkeleton } from './Skeleton';
+import { useAuthStore } from '@/store/auth';
 import type { AppRouter } from '@repo/api';
 import type { inferRouterOutputs } from '@trpc/server';
 
@@ -14,6 +15,7 @@ type SortOption = 'hot' | 'new' | 'top';
 interface InfinitePostListProps {
   channelId?: string;
   flair?: string;
+  tag?: string;
   onStartPost?: (content?: string) => void;
 }
 
@@ -22,26 +24,39 @@ const MAX_OFFSET = 1000;
 
 const SORT_LABELS: Record<SortOption, { label: string; hint: string }> = {
   hot: { label: '인기', hint: '반응이 빠르게 모이는 글' },
-  new: { label: '최신', hint: '방금 올라온 이야기' },
-  top: { label: '상위', hint: '추천을 많이 받은 글' },
+  new: { label: '최신', hint: '방금 올라온 글' },
+  top: { label: '상위', hint: '추천이 많이 받은 글' },
 };
 
 const STARTERS = [
-  '요즘 우리 회사에서 가장 궁금한 점이 있어요.',
-  '업무 효율을 올리는 도구나 루틴을 공유해주세요.',
-  '신입이나 이직자가 알면 좋은 팁이 있을까요?',
+  '요즘 본인 업무에서 가장 유용한 팁이 있나요?',
+  '사무실 문화나 협업에서 재미있었던 순간을 공유해 주세요.',
+  '입사 초반에 알았으면 좋았을 내용이 있다면?',
 ];
 
-export function InfinitePostList({ channelId, flair, onStartPost }: InfinitePostListProps) {
+export function InfinitePostList({ channelId, flair, tag, onStartPost }: InfinitePostListProps) {
   const [sort, setSort] = useState<SortOption>('hot');
   const [offset, setOffset] = useState(0);
   const [allPosts, setAllPosts] = useState<FeedPost[]>([]);
   const [hasMore, setHasMore] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuthStore();
 
-  const { data, isFetching, isError, refetch } = trpc.posts.getFeed.useQuery(
+  const feedQuery = trpc.posts.getFeed.useQuery(
     { channelId, flair, sort, limit: LIMIT, offset },
-    { keepPreviousData: true, retry: false }
+    { keepPreviousData: true, retry: false, enabled: !tag }
+  );
+  const tagQuery = trpc.posts.getByTag.useQuery(
+    { tag: tag ?? '', sort, limit: LIMIT, offset },
+    { keepPreviousData: true, retry: false, enabled: !!tag }
+  );
+  const activeQuery = tag ? tagQuery : feedQuery;
+  const { data, isFetching, isError, refetch } = activeQuery;
+
+  const postIds = allPosts.map((post) => post.id);
+  const { data: savedMap = {} as Record<string, boolean> } = trpc.saves.getIsSavedMap.useQuery(
+    { postIds },
+    { enabled: !!user && postIds.length > 0 }
   );
 
   useEffect(() => {
@@ -62,7 +77,7 @@ export function InfinitePostList({ channelId, flair, onStartPost }: InfinitePost
     setOffset(0);
     setAllPosts([]);
     setHasMore(true);
-  }, [sort, channelId, flair]);
+  }, [sort, channelId, flair, tag]);
 
   const loadMore = useCallback(() => {
     if (!isFetching && !isError && hasMore && offset + LIMIT < MAX_OFFSET) {
@@ -90,6 +105,13 @@ export function InfinitePostList({ channelId, flair, onStartPost }: InfinitePost
     refetch();
   }
 
+  const emptyLabel = tag
+    ? `#${tag} 태그를 사용한 글이 아직 없어요`
+    : '아직 조건에 맞는 글이 없어요';
+  const emptyDescription = tag
+    ? '다른 해시태그를 살펴보거나, 직접 새 글을 작성해 보세요.'
+    : '조금 더 넓게 보거나 다른 채널에서 다시 찾아보세요.';
+
   return (
     <section className="space-y-4">
       <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
@@ -116,7 +138,7 @@ export function InfinitePostList({ channelId, flair, onStartPost }: InfinitePost
 
       <div className="space-y-3">
         {allPosts.map((post) => (
-          <PostCard key={post.id} post={post} onDeleted={handleDeleted} />
+          <PostCard key={post.id} post={post} onDeleted={handleDeleted} isSaved={savedMap[post.id] ?? false} />
         ))}
 
         {isFetching && allPosts.length === 0 && (
@@ -133,10 +155,8 @@ export function InfinitePostList({ channelId, flair, onStartPost }: InfinitePost
 
         {!isFetching && allPosts.length === 0 && (
           <div className="rounded-lg border border-dashed border-slate-300 bg-white px-5 py-8 text-center">
-            <p className="text-lg font-semibold text-slate-900">아직 이 조건에 맞는 글이 없습니다</p>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-              첫 글은 늘 조금 어렵습니다. 가벼운 질문이나 공유로 흐름을 열어보세요.
-            </p>
+            <p className="text-lg font-semibold text-slate-900">{emptyLabel}</p>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{emptyDescription}</p>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
               {STARTERS.map((starter) => (
                 <button
@@ -161,7 +181,12 @@ export function InfinitePostList({ channelId, flair, onStartPost }: InfinitePost
           <div className="rounded-lg border border-red-100 bg-red-50 px-5 py-4 text-center">
             <p className="text-sm text-red-600">글을 불러오는 중 오류가 발생했습니다.</p>
             <button
-              onClick={() => { setOffset(0); setAllPosts([]); setHasMore(true); refetch(); }}
+              onClick={() => {
+                setOffset(0);
+                setAllPosts([]);
+                setHasMore(true);
+                refetch();
+              }}
               className="mt-2 text-xs font-medium text-red-500 underline hover:text-red-700"
             >
               다시 시도
@@ -170,7 +195,7 @@ export function InfinitePostList({ channelId, flair, onStartPost }: InfinitePost
         )}
 
         {!isError && !hasMore && allPosts.length > 0 && (
-          <div className="py-4 text-center text-xs text-slate-400">모든 글을 확인했습니다</div>
+          <div className="py-4 text-center text-xs text-slate-400">모든 글을 확인했어요</div>
         )}
       </div>
 

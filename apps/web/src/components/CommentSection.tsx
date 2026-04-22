@@ -9,8 +9,8 @@ import { VoteButton } from './VoteButton';
 import { ConfirmDialog } from './ConfirmDialog';
 import { CommentSkeleton } from './Skeleton';
 import { relativeTime } from '@/lib/time';
-import { supabase } from '@/lib/supabase';
 import { toast } from '@/store/toast';
+import { useRealtimeComments } from '@/hooks/useRealtimeComments';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { AppRouter } from '@repo/api';
 
@@ -238,18 +238,7 @@ export function CommentSection({ postId, commentCount }: CommentSectionProps) {
   const utils = trpc.useContext();
 
   const { data: commentTree, isLoading } = trpc.comments.getByPost.useQuery({ postId });
-
-  useEffect(() => {
-    const channel = supabase
-      .channel(`comments:${postId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'comments', filter: `post_id=eq.${postId}` },
-        () => utils.comments.getByPost.invalidate({ postId })
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [postId, utils.comments.getByPost]);
+  useRealtimeComments(postId);
 
   const allCommentIds = commentTree
     ? commentTree.flatMap((c) => [c.id, ...c.replies.map((r) => r.id)])
