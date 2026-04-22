@@ -46,6 +46,153 @@ BEGIN
 END $$;
 
 -- =========================================================
+-- Clear previous demo data so reruns stay idempotent.
+-- We delete by slug and fixed demo IDs to tolerate older runs
+-- where channel IDs differed from the current seed.
+-- =========================================================
+DELETE FROM reactions r
+USING comments c, posts p, channels ch
+WHERE (
+  (r.post_id = p.id AND p.channel_id = ch.id)
+  OR
+  (r.comment_id = c.id AND c.post_id = p.id AND p.channel_id = ch.id)
+)
+AND ch.slug IN (
+  'notice',
+  'free',
+  'qna',
+  'knowledge',
+  'tech',
+  'culture',
+  'anon-suggest',
+  'anon-concern',
+  'space-projects',
+  'space-study',
+  'space-tf',
+  'space-hobby'
+);
+
+DELETE FROM votes v
+USING comments c, posts p, channels ch
+WHERE (
+  (v.target_type = 'post' AND v.target_id = p.id AND p.channel_id = ch.id)
+  OR
+  (v.target_type = 'comment' AND v.target_id = c.id AND c.post_id = p.id AND p.channel_id = ch.id)
+)
+AND ch.slug IN (
+  'notice',
+  'free',
+  'qna',
+  'knowledge',
+  'tech',
+  'culture',
+  'anon-suggest',
+  'anon-concern',
+  'space-projects',
+  'space-study',
+  'space-tf',
+  'space-hobby'
+);
+
+DELETE FROM notifications n
+USING comments c, posts p, channels ch
+WHERE (
+  (n.post_id = p.id AND p.channel_id = ch.id)
+  OR
+  (n.target_type = 'comment' AND n.target_id = c.id AND c.post_id = p.id AND p.channel_id = ch.id)
+  OR
+  (n.target_type = 'post' AND n.target_id = p.id AND p.channel_id = ch.id)
+)
+AND ch.slug IN (
+  'notice',
+  'free',
+  'qna',
+  'knowledge',
+  'tech',
+  'culture',
+  'anon-suggest',
+  'anon-concern',
+  'space-projects',
+  'space-study',
+  'space-tf',
+  'space-hobby'
+);
+
+DELETE FROM comments cmt
+USING posts p, channels ch
+WHERE cmt.post_id = p.id
+  AND p.channel_id = ch.id
+  AND ch.slug IN (
+    'notice',
+    'free',
+    'qna',
+    'knowledge',
+    'tech',
+    'culture',
+    'anon-suggest',
+    'anon-concern',
+    'space-projects',
+    'space-study',
+    'space-tf',
+    'space-hobby'
+  );
+
+DELETE FROM posts p
+USING channels ch
+WHERE p.channel_id = ch.id
+  AND ch.slug IN (
+    'notice',
+    'free',
+    'qna',
+    'knowledge',
+    'tech',
+    'culture',
+    'anon-suggest',
+    'anon-concern',
+    'space-projects',
+    'space-study',
+    'space-tf',
+    'space-hobby'
+  );
+
+DELETE FROM channel_members cm
+USING channels ch
+WHERE cm.channel_id = ch.id
+  AND ch.slug IN (
+    'notice',
+    'free',
+    'qna',
+    'knowledge',
+    'tech',
+    'culture',
+    'anon-suggest',
+    'anon-concern',
+    'space-projects',
+    'space-study',
+    'space-tf',
+    'space-hobby'
+  );
+
+DELETE FROM channel_requests
+WHERE slug IN ('data-team', 'running-club', 'private-lab');
+
+DELETE FROM channels
+WHERE slug IN (
+  'notice',
+  'free',
+  'qna',
+  'knowledge',
+  'tech',
+  'culture',
+  'anon-suggest',
+  'anon-concern',
+  'space-projects',
+  'space-study',
+  'space-tf',
+  'space-hobby'
+);
+
+-- =========================================================
 -- Auth users
 -- =========================================================
 INSERT INTO auth.users (
