@@ -14,7 +14,7 @@ import {
   check,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 
 // ============================================
 // Profiles (extends Supabase Auth)
@@ -405,3 +405,145 @@ export const reports = pgTable(
     };
   }
 );
+
+export const profilesRelations = relations(profiles, ({ many }) => ({
+  posts: many(posts),
+  comments: many(comments),
+  votes: many(votes),
+  reactions: many(reactions),
+  saves: many(saves),
+  channelRequests: many(channelRequests),
+  notifications: many(notifications),
+  reports: many(reports),
+}));
+
+export const channelsRelations = relations(channels, ({ one, many }) => ({
+  creator: one(profiles, {
+    fields: [channels.createdBy],
+    references: [profiles.id],
+  }),
+  posts: many(posts),
+  requests: many(channelRequests),
+  members: many(channelMembers),
+  children: many(channels, { relationName: 'channelParent' }),
+  parent: one(channels, {
+    fields: [channels.parentId],
+    references: [channels.id],
+    relationName: 'channelParent',
+  }),
+}));
+
+export const postsRelations = relations(posts, ({ one, many }) => ({
+  author: one(profiles, {
+    fields: [posts.authorId],
+    references: [profiles.id],
+  }),
+  channel: one(channels, {
+    fields: [posts.channelId],
+    references: [channels.id],
+  }),
+  comments: many(comments),
+  pollOptions: many(pollOptions),
+  pollVotes: many(pollVotes),
+  saves: many(saves),
+  tags: many(postTags),
+  notifications: many(notifications),
+  reactions: many(reactions),
+  votes: many(votes),
+}));
+
+export const commentsRelations = relations(comments, ({ one, many }) => ({
+  author: one(profiles, {
+    fields: [comments.authorId],
+    references: [profiles.id],
+  }),
+  post: one(posts, {
+    fields: [comments.postId],
+    references: [posts.id],
+  }),
+  parent: one(comments, {
+    fields: [comments.parentId],
+    references: [comments.id],
+    relationName: 'commentTree',
+  }),
+  replies: many(comments, { relationName: 'commentTree' }),
+  reactions: many(reactions),
+  votes: many(votes),
+}));
+
+export const votesRelations = relations(votes, ({ one }) => ({
+  voter: one(profiles, {
+    fields: [votes.userId],
+    references: [profiles.id],
+  }),
+}));
+
+export const reactionsRelations = relations(reactions, ({ one }) => ({
+  actor: one(profiles, {
+    fields: [reactions.userId],
+    references: [profiles.id],
+  }),
+  post: one(posts, {
+    fields: [reactions.postId],
+    references: [posts.id],
+  }),
+  comment: one(comments, {
+    fields: [reactions.commentId],
+    references: [comments.id],
+  }),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  recipient: one(profiles, {
+    fields: [notifications.recipientId],
+    references: [profiles.id],
+    relationName: 'notificationRecipient',
+  }),
+  actor: one(profiles, {
+    fields: [notifications.actorId],
+    references: [profiles.id],
+    relationName: 'notificationActor',
+  }),
+  post: one(posts, {
+    fields: [notifications.postId],
+    references: [posts.id],
+  }),
+}));
+
+export const channelMembersRelations = relations(channelMembers, ({ one }) => ({
+  channel: one(channels, {
+    fields: [channelMembers.channelId],
+    references: [channels.id],
+  }),
+  member: one(profiles, {
+    fields: [channelMembers.userId],
+    references: [profiles.id],
+  }),
+}));
+
+export const savesRelations = relations(saves, ({ one }) => ({
+  user: one(profiles, {
+    fields: [saves.userId],
+    references: [profiles.id],
+  }),
+  post: one(posts, {
+    fields: [saves.postId],
+    references: [posts.id],
+  }),
+}));
+
+export const channelRequestsRelations = relations(channelRequests, ({ one }) => ({
+  requester: one(profiles, {
+    fields: [channelRequests.requestedBy],
+    references: [profiles.id],
+  }),
+  reviewer: one(profiles, {
+    fields: [channelRequests.reviewedBy],
+    references: [profiles.id],
+    relationName: 'channelRequestReviewer',
+  }),
+  createdChannel: one(channels, {
+    fields: [channelRequests.createdChannelId],
+    references: [channels.id],
+  }),
+}));

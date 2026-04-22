@@ -8,9 +8,9 @@ type PresencePayload = {
 };
 
 /**
- * Track online users in the shared `online-users` presence channel.
+ * Track online users in a presence room.
  */
-export function usePresence(userId?: string | null) {
+export function usePresence(userId?: string | null, roomKey = 'online-users') {
   const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
 
   useEffect(() => {
@@ -19,7 +19,7 @@ export function usePresence(userId?: string | null) {
       return;
     }
 
-    const channel = supabase.channel('online-users', {
+    const channel = supabase.channel(roomKey, {
       config: {
         presence: { key: userId },
       },
@@ -47,7 +47,7 @@ export function usePresence(userId?: string | null) {
       void channel.untrack();
       void supabase.removeChannel(channel);
     };
-  }, [userId]);
+  }, [roomKey, userId]);
 
   return onlineUserIds;
 }

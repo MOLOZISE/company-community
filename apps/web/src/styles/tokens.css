@@ -1,0 +1,44 @@
+:root {
+  --cc-bg: #f5f7fb;
+  --cc-bg-soft: #eef4ff;
+  --cc-surface: #ffffff;
+  --cc-surface-soft: #f8fafc;
+  --cc-ink: #0f172a;
+  --cc-ink-muted: #64748b;
+  --cc-border: rgba(148, 163, 184, 0.24);
+  --cc-brand: #2563eb;
+  --cc-brand-strong: #1d4ed8;
+  --cc-brand-soft: rgba(37, 99, 235, 0.08);
+  --cc-warm: #f59e0b;
+  --cc-warm-soft: rgba(245, 158, 11, 0.12);
+  --cc-success: #16a34a;
+  --cc-danger: #dc2626;
+  --cc-shadow: 0 18px 60px rgba(15, 23, 42, 0.08);
+  --cc-shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.06);
+  --cc-radius-card: 1.5rem;
+  --cc-radius-pill: 9999px;
+  --cc-gap: 1rem;
+  --cc-font-sans: 'Inter', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+}
+
+@theme inline {
+  --color-bg: var(--cc-bg);
+  --color-bg-soft: var(--cc-bg-soft);
+  --color-surface: var(--cc-surface);
+  --color-surface-soft: var(--cc-surface-soft);
+  --color-ink: var(--cc-ink);
+  --color-ink-muted: var(--cc-ink-muted);
+  --color-border: var(--cc-border);
+  --color-brand: var(--cc-brand);
+  --color-brand-strong: var(--cc-brand-strong);
+  --color-brand-soft: var(--cc-brand-soft);
+  --color-warm: var(--cc-warm);
+  --color-warm-soft: var(--cc-warm-soft);
+  --color-success: var(--cc-success);
+  --color-danger: var(--cc-danger);
+  --radius-card: var(--cc-radius-card);
+  --radius-pill: var(--cc-radius-pill);
+  --shadow-card: var(--cc-shadow);
+  --shadow-card-soft: var(--cc-shadow-soft);
+  --font-sans: var(--cc-font-sans);
+}

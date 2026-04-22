@@ -35,8 +35,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="text-sm text-slate-400">로딩 중...</div>
+      <div className="flex min-h-screen items-center justify-center bg-transparent">
+        <div className="text-sm text-slate-400">불러오는 중...</div>
       </div>
     );
   }
@@ -44,7 +44,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-transparent">
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <div className="flex shrink-0 items-center gap-2">

@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <body className="bg-white text-slate-900">
+      <body className="bg-[var(--cc-bg)] text-[var(--cc-ink)]">
         <TRPCProvider>
           <AuthProvider>{children}</AuthProvider>
           <ToastContainer />

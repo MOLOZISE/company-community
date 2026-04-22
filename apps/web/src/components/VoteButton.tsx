@@ -1,5 +1,6 @@
 'use client';
 
+import { motion } from 'framer-motion';
 import { trpc } from '@/lib/trpc';
 import { useAuthStore } from '@/store/auth';
 import { useRouter } from 'next/navigation';
@@ -49,37 +50,62 @@ export function VoteButton({
 
   return (
     <div className="flex items-center gap-1">
-      <button
+      <motion.button
+        type="button"
         onClick={() => handleVote('up')}
         disabled={voteMutation.isLoading}
-        className={`flex items-center gap-1 px-2 py-1 rounded text-sm font-medium transition-colors ${
+        whileTap={{ scale: 0.92, y: -1 }}
+        transition={{ type: 'spring', stiffness: 500, damping: 28 }}
+        className={`flex items-center gap-1 rounded px-2 py-1 text-sm font-medium transition-colors ${
           currentVote === 'up'
-            ? 'text-orange-500 bg-orange-50'
-            : 'text-slate-400 hover:text-orange-500 hover:bg-orange-50'
+            ? 'bg-orange-50 text-orange-500'
+            : 'text-slate-400 hover:bg-orange-50 hover:text-orange-500'
         }`}
       >
-        ▲
-      </button>
-      <span
-        className={`text-sm font-semibold min-w-[20px] text-center ${
+        <ArrowIcon direction="up" />
+      </motion.button>
+
+      <motion.span
+        key={score}
+        layout
+        initial={{ y: 6, opacity: 0.2, scale: 0.96 }}
+        animate={{ y: 0, opacity: 1, scale: 1 }}
+        transition={{ type: 'spring', stiffness: 420, damping: 26 }}
+        className={`min-w-[20px] text-center text-sm font-semibold ${
           score > 0 ? 'text-orange-500' : score < 0 ? 'text-blue-500' : 'text-slate-400'
         }`}
       >
         {score}
-      </span>
+      </motion.span>
+
       {downvoteCount !== undefined && (
-        <button
+        <motion.button
+          type="button"
           onClick={() => handleVote('down')}
           disabled={voteMutation.isLoading}
-          className={`flex items-center gap-1 px-2 py-1 rounded text-sm font-medium transition-colors ${
+          whileTap={{ scale: 0.92, y: 1 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 28 }}
+          className={`flex items-center gap-1 rounded px-2 py-1 text-sm font-medium transition-colors ${
             currentVote === 'down'
-              ? 'text-blue-500 bg-blue-50'
-              : 'text-slate-400 hover:text-blue-500 hover:bg-blue-50'
+              ? 'bg-blue-50 text-blue-500'
+              : 'text-slate-400 hover:bg-blue-50 hover:text-blue-500'
           }`}
         >
-          ▼
-        </button>
+          <ArrowIcon direction="down" />
+        </motion.button>
       )}
     </div>
+  );
+}
+
+function ArrowIcon({ direction }: { direction: 'up' | 'down' }) {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
+      {direction === 'up' ? (
+        <path strokeLinecap="round" strokeLinejoin="round" d="m6 12 4-4 4 4" />
+      ) : (
+        <path strokeLinecap="round" strokeLinejoin="round" d="m14 8-4 4-4-4" />
+      )}
+    </svg>
   );
 }

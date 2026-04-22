@@ -1,3 +1,26 @@
+@import './tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: light;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background:
+      radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 34%),
+      radial-gradient(circle at top right, rgba(245, 158, 11, 0.08), transparent 28%),
+      var(--cc-bg);
+    color: var(--cc-ink);
+    font-family: var(--cc-font-sans);
+  }
+
+  ::selection {
+    background: rgba(37, 99, 235, 0.18);
+    color: var(--cc-ink);
+  }
+}
