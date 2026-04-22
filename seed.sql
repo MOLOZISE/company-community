@@ -1,16 +1,15 @@
-BEGIN;
+-- =============================================================
+-- HD현대 그룹 사내 커뮤니티 - 풍부한 시드 데이터
+-- 실행 방법: Supabase SQL Editor에 전체 내용 붙여넣기 후 실행
+-- 2026-04-23 기준 / 재실행 안전 (idempotent)
+-- =============================================================
 
+BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- =========================================================
--- Backfill older databases so the seed can be re-run safely.
--- =========================================================
-ALTER TABLE profiles
-  ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'member';
-
-ALTER TABLE notifications
-  ADD COLUMN IF NOT EXISTS post_id UUID REFERENCES posts(id);
-
+-- 스키마 backfill (이전 버전 호환)
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'member';
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS post_id UUID REFERENCES posts(id);
 ALTER TABLE channels
   ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'board',
   ADD COLUMN IF NOT EXISTS scope VARCHAR(50) DEFAULT 'company',
@@ -21,7 +20,6 @@ ALTER TABLE channels
   ADD COLUMN IF NOT EXISTS default_sort VARCHAR(50) DEFAULT 'latest',
   ADD COLUMN IF NOT EXISTS purpose VARCHAR(100) DEFAULT 'discussion',
   ADD COLUMN IF NOT EXISTS display_order INTEGER DEFAULT 0;
-
 ALTER TABLE channel_requests
   ADD COLUMN IF NOT EXISTS requested_type VARCHAR(50) DEFAULT 'board',
   ADD COLUMN IF NOT EXISTS requested_scope VARCHAR(50) DEFAULT 'company',
@@ -30,1617 +28,2752 @@ ALTER TABLE channel_requests
 
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'reactions_target_check'
-  ) THEN
-    ALTER TABLE reactions
-      ADD CONSTRAINT reactions_target_check
-      CHECK (
-        (post_id IS NOT NULL AND comment_id IS NULL)
-        OR
-        (post_id IS NULL AND comment_id IS NOT NULL)
-      );
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'reactions_target_check') THEN
+    ALTER TABLE reactions ADD CONSTRAINT reactions_target_check
+      CHECK ((post_id IS NOT NULL AND comment_id IS NULL) OR (post_id IS NULL AND comment_id IS NOT NULL));
   END IF;
 END $$;
 
 COMMIT;
 
+-- =============================================================
+-- CLEANUP: 이전 시드 데이터 제거 (재실행 안전)
+-- =============================================================
 BEGIN;
 
--- =========================================================
--- Clear previous demo data so reruns stay idempotent.
--- We collect target channel IDs by both fixed ID and slug so
--- reruns also clean up older rows that were recreated with a
--- different UUID.
--- =========================================================
-DELETE FROM reactions
-WHERE post_id IN (
-  SELECT p.id
-  FROM posts p
-  WHERE p.channel_id IN (
-    SELECT id
-    FROM channels
-    WHERE id IN (
-      'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-      'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-      'cccccccc-cccc-cccc-cccc-cccccccccccc',
-      'dddddddd-dddd-dddd-dddd-dddddddddddd',
-      'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-      'f1111111-1111-1111-1111-111111111111',
-      'f2222222-2222-2222-2222-222222222222',
-      'f3333333-3333-3333-3333-333333333333',
-      'f4444444-4444-4444-4444-444444444444',
-      'f5555555-5555-5555-5555-555555555555',
-      'f6666666-6666-6666-6666-666666666666',
-      'f7777777-7777-7777-7777-777777777777'
-    )
+DO $$
+DECLARE
+  seed_channel_ids UUID[] := ARRAY[
+    -- 기존 채널 IDs
+    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::UUID,
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID,
+    'cccccccc-cccc-cccc-cccc-cccccccccccc'::UUID,
+    'dddddddd-dddd-dddd-dddd-dddddddddddd'::UUID,
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'::UUID,
+    'f1111111-1111-1111-1111-111111111111'::UUID,
+    'f2222222-2222-2222-2222-222222222222'::UUID,
+    'f3333333-3333-3333-3333-333333333333'::UUID,
+    'f4444444-4444-4444-4444-444444444444'::UUID,
+    'f5555555-5555-5555-5555-555555555555'::UUID,
+    'f6666666-6666-6666-6666-666666666666'::UUID,
+    'f7777777-7777-7777-7777-777777777777'::UUID,
+    -- 새 채널 IDs (CH01-CH38)
+    '10000000-0000-0000-0000-000000000001'::UUID,
+    '10000000-0000-0000-0000-000000000002'::UUID,
+    '10000000-0000-0000-0000-000000000003'::UUID,
+    '10000000-0000-0000-0000-000000000004'::UUID,
+    '10000000-0000-0000-0000-000000000005'::UUID,
+    '10000000-0000-0000-0000-000000000006'::UUID,
+    '10000000-0000-0000-0000-000000000007'::UUID,
+    '10000000-0000-0000-0000-000000000008'::UUID,
+    '10000000-0000-0000-0000-000000000009'::UUID,
+    '10000000-0000-0000-0000-000000000010'::UUID,
+    '10000000-0000-0000-0000-000000000011'::UUID,
+    '10000000-0000-0000-0000-000000000012'::UUID,
+    '10000000-0000-0000-0000-000000000013'::UUID,
+    '10000000-0000-0000-0000-000000000014'::UUID,
+    '10000000-0000-0000-0000-000000000015'::UUID,
+    '10000000-0000-0000-0000-000000000016'::UUID,
+    '10000000-0000-0000-0000-000000000017'::UUID,
+    '10000000-0000-0000-0000-000000000018'::UUID,
+    '10000000-0000-0000-0000-000000000019'::UUID,
+    '10000000-0000-0000-0000-000000000020'::UUID,
+    '10000000-0000-0000-0000-000000000021'::UUID,
+    '10000000-0000-0000-0000-000000000022'::UUID,
+    '10000000-0000-0000-0000-000000000023'::UUID,
+    '10000000-0000-0000-0000-000000000024'::UUID,
+    '10000000-0000-0000-0000-000000000025'::UUID,
+    '10000000-0000-0000-0000-000000000026'::UUID,
+    '10000000-0000-0000-0000-000000000027'::UUID,
+    '10000000-0000-0000-0000-000000000028'::UUID,
+    '10000000-0000-0000-0000-000000000029'::UUID,
+    '10000000-0000-0000-0000-000000000030'::UUID,
+    '10000000-0000-0000-0000-000000000031'::UUID,
+    '10000000-0000-0000-0000-000000000032'::UUID,
+    '10000000-0000-0000-0000-000000000033'::UUID,
+    '10000000-0000-0000-0000-000000000034'::UUID,
+    '10000000-0000-0000-0000-000000000035'::UUID,
+    '10000000-0000-0000-0000-000000000036'::UUID,
+    '10000000-0000-0000-0000-000000000037'::UUID,
+    '10000000-0000-0000-0000-000000000038'::UUID
+  ];
+  seed_post_ids UUID[];
+  seed_comment_ids UUID[];
+BEGIN
+  -- 시드 채널에 속한 포스트 ID 수집
+  SELECT ARRAY(SELECT id FROM posts WHERE channel_id = ANY(seed_channel_ids)
+    OR channel_id IN (SELECT id FROM channels WHERE slug IN (
+      'notice','free','qna','knowledge','tech','culture','anon-suggest','anon-concern',
+      'space-projects','space-study','space-tf','space-hobby',
+      'anonymous','praise','ideas','hhi-board','ksoe-board','hdec-board',
+      'hshi-board','hmms-board','hhce-board','club-hiking','club-reading',
+      'club-fitness','club-wine','club-golf','club-photography','club-gaming',
+      'club-cooking','blind-date','stock-market','restaurant','house-info',
+      'car-talk','travel','secondhand','parenting','career','wfh',
+      'tech-stack','tool-review','onboarding','confess','salary','boss-story','work-life'
+    ))
+  ) INTO seed_post_ids;
+
+  -- 시드 포스트에 달린 댓글 ID 수집
+  SELECT ARRAY(SELECT id FROM comments WHERE post_id = ANY(seed_post_ids)) INTO seed_comment_ids;
+
+  -- 순서대로 삭제
+  DELETE FROM reactions WHERE post_id = ANY(seed_post_ids) OR comment_id = ANY(seed_comment_ids);
+  DELETE FROM votes WHERE (target_type='post' AND target_id = ANY(seed_post_ids))
+                       OR (target_type='comment' AND target_id = ANY(seed_comment_ids));
+  DELETE FROM saves WHERE post_id = ANY(seed_post_ids);
+  DELETE FROM post_tags WHERE post_id = ANY(seed_post_ids);
+  DELETE FROM notifications WHERE post_id = ANY(seed_post_ids);
+  DELETE FROM comments WHERE post_id = ANY(seed_post_ids);
+  DELETE FROM posts WHERE id = ANY(seed_post_ids);
+  DELETE FROM channel_members WHERE channel_id = ANY(seed_channel_ids)
+    OR channel_id IN (SELECT id FROM channels WHERE slug IN (
+      'notice','free','qna','knowledge','tech','culture','anon-suggest','anon-concern',
+      'space-projects','space-study','space-tf','space-hobby',
+      'anonymous','praise','ideas','hhi-board','ksoe-board','hdec-board',
+      'hshi-board','hmms-board','hhce-board','club-hiking','club-reading',
+      'club-fitness','club-wine','club-golf','club-photography','club-gaming',
+      'club-cooking','blind-date','stock-market','restaurant','house-info',
+      'car-talk','travel','secondhand','parenting','career','wfh',
+      'tech-stack','tool-review','onboarding','confess','salary','boss-story','work-life'
+    ));
+  DELETE FROM channels WHERE id = ANY(seed_channel_ids)
     OR slug IN (
-      'notice',
-      'free',
-      'qna',
-      'knowledge',
-      'tech',
-      'culture',
-      'anon-suggest',
-      'anon-concern',
-      'space-projects',
-      'space-study',
-      'space-tf',
-      'space-hobby'
-    )
-  )
-)
-OR comment_id IN (
-  SELECT c.id
-  FROM comments c
-  JOIN posts p ON p.id = c.post_id
-  WHERE p.channel_id IN (
-    SELECT id
-    FROM channels
-    WHERE id IN (
-      'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-      'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-      'cccccccc-cccc-cccc-cccc-cccccccccccc',
-      'dddddddd-dddd-dddd-dddd-dddddddddddd',
-      'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-      'f1111111-1111-1111-1111-111111111111',
-      'f2222222-2222-2222-2222-222222222222',
-      'f3333333-3333-3333-3333-333333333333',
-      'f4444444-4444-4444-4444-444444444444',
-      'f5555555-5555-5555-5555-555555555555',
-      'f6666666-6666-6666-6666-666666666666',
-      'f7777777-7777-7777-7777-777777777777'
-    )
-    OR slug IN (
-      'notice',
-      'free',
-      'qna',
-      'knowledge',
-      'tech',
-      'culture',
-      'anon-suggest',
-      'anon-concern',
-      'space-projects',
-      'space-study',
-      'space-tf',
-      'space-hobby'
-    )
-  )
-);
-
-DELETE FROM votes
-WHERE target_type = 'post'
-  AND target_id IN (
-    SELECT p.id
-    FROM posts p
-    WHERE p.channel_id IN (
-      SELECT id
-      FROM channels
-      WHERE id IN (
-        'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-        'cccccccc-cccc-cccc-cccc-cccccccccccc',
-        'dddddddd-dddd-dddd-dddd-dddddddddddd',
-        'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-        'f1111111-1111-1111-1111-111111111111',
-        'f2222222-2222-2222-2222-222222222222',
-        'f3333333-3333-3333-3333-333333333333',
-        'f4444444-4444-4444-4444-444444444444',
-        'f5555555-5555-5555-5555-555555555555',
-        'f6666666-6666-6666-6666-666666666666',
-        'f7777777-7777-7777-7777-777777777777'
-      )
-      OR slug IN (
-        'notice',
-        'free',
-        'qna',
-        'knowledge',
-        'tech',
-        'culture',
-        'anon-suggest',
-        'anon-concern',
-        'space-projects',
-        'space-study',
-        'space-tf',
-        'space-hobby'
-      )
-    )
-  )
-OR target_type = 'comment'
-  AND target_id IN (
-    SELECT c.id
-    FROM comments c
-    JOIN posts p ON p.id = c.post_id
-    WHERE p.channel_id IN (
-      SELECT id
-      FROM channels
-      WHERE id IN (
-        'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-        'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-        'cccccccc-cccc-cccc-cccc-cccccccccccc',
-        'dddddddd-dddd-dddd-dddd-dddddddddddd',
-        'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-        'f1111111-1111-1111-1111-111111111111',
-        'f2222222-2222-2222-2222-222222222222',
-        'f3333333-3333-3333-3333-333333333333',
-        'f4444444-4444-4444-4444-444444444444',
-        'f5555555-5555-5555-5555-555555555555',
-        'f6666666-6666-6666-6666-666666666666',
-        'f7777777-7777-7777-7777-777777777777'
-      )
-      OR slug IN (
-        'notice',
-        'free',
-        'qna',
-        'knowledge',
-        'tech',
-        'culture',
-        'anon-suggest',
-        'anon-concern',
-        'space-projects',
-        'space-study',
-        'space-tf',
-        'space-hobby'
-      )
-    )
-  );
-
-DELETE FROM notifications
-WHERE post_id IN (
-  SELECT p.id
-  FROM posts p
-  WHERE p.channel_id IN (
-    SELECT id
-    FROM channels
-    WHERE id IN (
-      'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-      'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-      'cccccccc-cccc-cccc-cccc-cccccccccccc',
-      'dddddddd-dddd-dddd-dddd-dddddddddddd',
-      'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-      'f1111111-1111-1111-1111-111111111111',
-      'f2222222-2222-2222-2222-222222222222',
-      'f3333333-3333-3333-3333-333333333333',
-      'f4444444-4444-4444-4444-444444444444',
-      'f5555555-5555-5555-5555-555555555555',
-      'f6666666-6666-6666-6666-666666666666',
-      'f7777777-7777-7777-7777-777777777777'
-    )
-    OR slug IN (
-      'notice',
-      'free',
-      'qna',
-      'knowledge',
-      'tech',
-      'culture',
-      'anon-suggest',
-      'anon-concern',
-      'space-projects',
-      'space-study',
-      'space-tf',
-      'space-hobby'
-    )
-  )
-)
-OR (target_type = 'post' AND target_id IN (
-  SELECT p.id
-  FROM posts p
-  WHERE p.channel_id IN (
-    SELECT id
-    FROM channels
-    WHERE id IN (
-      'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-      'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-      'cccccccc-cccc-cccc-cccc-cccccccccccc',
-      'dddddddd-dddd-dddd-dddd-dddddddddddd',
-      'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-      'f1111111-1111-1111-1111-111111111111',
-      'f2222222-2222-2222-2222-222222222222',
-      'f3333333-3333-3333-3333-333333333333',
-      'f4444444-4444-4444-4444-444444444444',
-      'f5555555-5555-5555-5555-555555555555',
-      'f6666666-6666-6666-6666-666666666666',
-      'f7777777-7777-7777-7777-777777777777'
-    )
-    OR slug IN (
-      'notice',
-      'free',
-      'qna',
-      'knowledge',
-      'tech',
-      'culture',
-      'anon-suggest',
-      'anon-concern',
-      'space-projects',
-      'space-study',
-      'space-tf',
-      'space-hobby'
-    )
-  )
-))
-OR (target_type = 'comment' AND target_id IN (
-  SELECT c.id
-  FROM comments c
-  JOIN posts p ON p.id = c.post_id
-  WHERE p.channel_id IN (
-    SELECT id
-    FROM channels
-    WHERE id IN (
-      'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-      'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-      'cccccccc-cccc-cccc-cccc-cccccccccccc',
-      'dddddddd-dddd-dddd-dddd-dddddddddddd',
-      'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-      'f1111111-1111-1111-1111-111111111111',
-      'f2222222-2222-2222-2222-222222222222',
-      'f3333333-3333-3333-3333-333333333333',
-      'f4444444-4444-4444-4444-444444444444',
-      'f5555555-5555-5555-5555-555555555555',
-      'f6666666-6666-6666-6666-666666666666',
-      'f7777777-7777-7777-7777-777777777777'
-    )
-    OR slug IN (
-      'notice',
-      'free',
-      'qna',
-      'knowledge',
-      'tech',
-      'culture',
-      'anon-suggest',
-      'anon-concern',
-      'space-projects',
-      'space-study',
-      'space-tf',
-      'space-hobby'
-    )
-  )
-));
-
-DELETE FROM comments
-WHERE post_id IN (
-  SELECT p.id
-  FROM posts p
-  WHERE p.channel_id IN (
-    SELECT id
-    FROM channels
-    WHERE id IN (
-      'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-      'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-      'cccccccc-cccc-cccc-cccc-cccccccccccc',
-      'dddddddd-dddd-dddd-dddd-dddddddddddd',
-      'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-      'f1111111-1111-1111-1111-111111111111',
-      'f2222222-2222-2222-2222-222222222222',
-      'f3333333-3333-3333-3333-333333333333',
-      'f4444444-4444-4444-4444-444444444444',
-      'f5555555-5555-5555-5555-555555555555',
-      'f6666666-6666-6666-6666-666666666666',
-      'f7777777-7777-7777-7777-777777777777'
-    )
-    OR slug IN (
-      'notice',
-      'free',
-      'qna',
-      'knowledge',
-      'tech',
-      'culture',
-      'anon-suggest',
-      'anon-concern',
-      'space-projects',
-      'space-study',
-      'space-tf',
-      'space-hobby'
-    )
-  )
-);
-
-DELETE FROM posts
-WHERE channel_id IN (
-  SELECT id
-  FROM channels
-  WHERE id IN (
-    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    'dddddddd-dddd-dddd-dddd-dddddddddddd',
-    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-    'f1111111-1111-1111-1111-111111111111',
-    'f2222222-2222-2222-2222-222222222222',
-    'f3333333-3333-3333-3333-333333333333',
-    'f4444444-4444-4444-4444-444444444444',
-    'f5555555-5555-5555-5555-555555555555',
-    'f6666666-6666-6666-6666-666666666666',
-    'f7777777-7777-7777-7777-777777777777'
-  )
-  OR slug IN (
-    'notice',
-    'free',
-    'qna',
-    'knowledge',
-    'tech',
-    'culture',
-    'anon-suggest',
-    'anon-concern',
-    'space-projects',
-    'space-study',
-    'space-tf',
-    'space-hobby'
-  )
-);
-
-DELETE FROM channel_members
-WHERE channel_id IN (
-  SELECT id
-  FROM channels
-  WHERE id IN (
-    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    'dddddddd-dddd-dddd-dddd-dddddddddddd',
-    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-    'f1111111-1111-1111-1111-111111111111',
-    'f2222222-2222-2222-2222-222222222222',
-    'f3333333-3333-3333-3333-333333333333',
-    'f4444444-4444-4444-4444-444444444444',
-    'f5555555-5555-5555-5555-555555555555',
-    'f6666666-6666-6666-6666-666666666666',
-    'f7777777-7777-7777-7777-777777777777'
-  )
-  OR slug IN (
-    'notice',
-    'free',
-    'qna',
-    'knowledge',
-    'tech',
-    'culture',
-    'anon-suggest',
-    'anon-concern',
-    'space-projects',
-    'space-study',
-    'space-tf',
-    'space-hobby'
-  )
-);
-
-DELETE FROM channel_requests
-WHERE slug IN ('data-team', 'running-club', 'private-lab');
-
-DELETE FROM channels
-WHERE id IN (
-  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-  'cccccccc-cccc-cccc-cccc-cccccccccccc',
-  'dddddddd-dddd-dddd-dddd-dddddddddddd',
-  'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-  'f1111111-1111-1111-1111-111111111111',
-  'f2222222-2222-2222-2222-222222222222',
-  'f3333333-3333-3333-3333-333333333333',
-  'f4444444-4444-4444-4444-444444444444',
-  'f5555555-5555-5555-5555-555555555555',
-  'f6666666-6666-6666-6666-666666666666',
-  'f7777777-7777-7777-7777-777777777777'
-)
-OR slug IN (
-  'notice',
-  'free',
-  'qna',
-  'knowledge',
-  'tech',
-  'culture',
-  'anon-suggest',
-  'anon-concern',
-  'space-projects',
-  'space-study',
-  'space-tf',
-  'space-hobby'
-);
-
--- =========================================================
--- Auth users
--- =========================================================
-INSERT INTO auth.users (
-  instance_id,
-  id,
-  aud,
-  role,
-  email,
-  encrypted_password,
-  email_confirmed_at,
-  raw_app_meta_data,
-  raw_user_meta_data,
-  created_at,
-  updated_at
-) VALUES
-  (
-    '00000000-0000-0000-0000-000000000000',
-    '11111111-1111-1111-1111-111111111111',
-    'authenticated',
-    'authenticated',
-    'mina.admin@company.demo',
-    crypt('Demo1234!', gen_salt('bf')),
-    NOW() - INTERVAL '30 days',
-    '{"provider":"email","providers":["email"]}'::jsonb,
-    '{"name":"Mina Admin"}'::jsonb,
-    NOW() - INTERVAL '30 days',
-    NOW()
-  ),
-  (
-    '00000000-0000-0000-0000-000000000000',
-    '22222222-2222-2222-2222-222222222222',
-    'authenticated',
-    'authenticated',
-    'seo.yun@company.demo',
-    crypt('Demo1234!', gen_salt('bf')),
-    NOW() - INTERVAL '28 days',
-    '{"provider":"email","providers":["email"]}'::jsonb,
-    '{"name":"Seo Yun"}'::jsonb,
-    NOW() - INTERVAL '28 days',
-    NOW()
-  ),
-  (
-    '00000000-0000-0000-0000-000000000000',
-    '33333333-3333-3333-3333-333333333333',
-    'authenticated',
-    'authenticated',
-    'junho.kim@company.demo',
-    crypt('Demo1234!', gen_salt('bf')),
-    NOW() - INTERVAL '26 days',
-    '{"provider":"email","providers":["email"]}'::jsonb,
-    '{"name":"Junho Kim"}'::jsonb,
-    NOW() - INTERVAL '26 days',
-    NOW()
-  ),
-  (
-    '00000000-0000-0000-0000-000000000000',
-    '44444444-4444-4444-4444-444444444444',
-    'authenticated',
-    'authenticated',
-    'hayeon.lee@company.demo',
-    crypt('Demo1234!', gen_salt('bf')),
-    NOW() - INTERVAL '24 days',
-    '{"provider":"email","providers":["email"]}'::jsonb,
-    '{"name":"Hayeon Lee"}'::jsonb,
-    NOW() - INTERVAL '24 days',
-    NOW()
-  ),
-  (
-    '00000000-0000-0000-0000-000000000000',
-    '55555555-5555-5555-5555-555555555555',
-    'authenticated',
-    'authenticated',
-    'taeho.park@company.demo',
-    crypt('Demo1234!', gen_salt('bf')),
-    NOW() - INTERVAL '22 days',
-    '{"provider":"email","providers":["email"]}'::jsonb,
-    '{"name":"Taeho Park"}'::jsonb,
-    NOW() - INTERVAL '22 days',
-    NOW()
-  ),
-  (
-    '00000000-0000-0000-0000-000000000000',
-    '66666666-6666-6666-6666-666666666666',
-    'authenticated',
-    'authenticated',
-    'sujin.choi@company.demo',
-    crypt('Demo1234!', gen_salt('bf')),
-    NOW() - INTERVAL '20 days',
-    '{"provider":"email","providers":["email"]}'::jsonb,
-    '{"name":"Sujin Choi"}'::jsonb,
-    NOW() - INTERVAL '20 days',
-    NOW()
-  )
-ON CONFLICT (id) DO UPDATE SET
-  email = EXCLUDED.email,
-  encrypted_password = EXCLUDED.encrypted_password,
-  email_confirmed_at = EXCLUDED.email_confirmed_at,
-  raw_app_meta_data = EXCLUDED.raw_app_meta_data,
-  raw_user_meta_data = EXCLUDED.raw_user_meta_data,
-  updated_at = EXCLUDED.updated_at;
-
--- =========================================================
--- Profiles
--- =========================================================
-INSERT INTO profiles (
-  id,
-  email,
-  display_name,
-  role,
-  department,
-  job_title,
-  avatar_url,
-  trust_score,
-  is_verified,
-  anonymous_seed,
-  created_at,
-  updated_at
-) VALUES
-  (
-    '11111111-1111-1111-1111-111111111111',
-    'mina.admin@company.demo',
-    'Mina Admin',
-    'admin',
-    'Platform',
-    'Engineering Manager',
-    'https://i.pravatar.cc/150?img=12',
-    98,
-    TRUE,
-    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-    NOW() - INTERVAL '30 days',
-    NOW()
-  ),
-  (
-    '22222222-2222-2222-2222-222222222222',
-    'seo.yun@company.demo',
-    'Seo Yun',
-    'moderator',
-    'People Ops',
-    'Community Manager',
-    'https://i.pravatar.cc/150?img=32',
-    92,
-    TRUE,
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    NOW() - INTERVAL '28 days',
-    NOW()
-  ),
-  (
-    '33333333-3333-3333-3333-333333333333',
-    'junho.kim@company.demo',
-    'Junho Kim',
-    'member',
-    'Backend',
-    'Software Engineer',
-    'https://i.pravatar.cc/150?img=14',
-    84,
-    TRUE,
-    'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    NOW() - INTERVAL '26 days',
-    NOW()
-  ),
-  (
-    '44444444-4444-4444-4444-444444444444',
-    'hayeon.lee@company.demo',
-    'Hayeon Lee',
-    'member',
-    'Design',
-    'Product Designer',
-    'https://i.pravatar.cc/150?img=47',
-    76,
-    FALSE,
-    'dddddddd-dddd-dddd-dddd-dddddddddddd',
-    NOW() - INTERVAL '24 days',
-    NOW()
-  ),
-  (
-    '55555555-5555-5555-5555-555555555555',
-    'taeho.park@company.demo',
-    'Taeho Park',
-    'member',
-    'Sales',
-    'Account Executive',
-    'https://i.pravatar.cc/150?img=21',
-    69,
-    FALSE,
-    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-    NOW() - INTERVAL '22 days',
-    NOW()
-  ),
-  (
-    '66666666-6666-6666-6666-666666666666',
-    'sujin.choi@company.demo',
-    'Sujin Choi',
-    'member',
-    'Product',
-    'Product Manager',
-    'https://i.pravatar.cc/150?img=5',
-    88,
-    TRUE,
-    'ffffffff-ffff-ffff-ffff-ffffffffffff',
-    NOW() - INTERVAL '20 days',
-    NOW()
-  )
-ON CONFLICT (email) DO UPDATE SET
-  display_name = EXCLUDED.display_name,
-  role = EXCLUDED.role,
-  department = EXCLUDED.department,
-  job_title = EXCLUDED.job_title,
-  avatar_url = EXCLUDED.avatar_url,
-  trust_score = EXCLUDED.trust_score,
-  is_verified = EXCLUDED.is_verified,
-  anonymous_seed = EXCLUDED.anonymous_seed,
-  updated_at = EXCLUDED.updated_at;
-
--- =========================================================
--- Channels
--- =========================================================
-INSERT INTO channels (
-  id,
-  slug,
-  name,
-  description,
-  icon_url,
-  is_private,
-  member_count,
-  post_count,
-  created_by,
-  created_at,
-  type,
-  scope,
-  posting_mode,
-  membership_type,
-  is_listed,
-  parent_id,
-  default_sort,
-  purpose,
-  display_order
-) VALUES
-  (
-    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-    'notice',
-    '공지사항',
-    '회사 공지와 운영 안내를 모아두는 공식 게시판',
-    NULL,
-    FALSE,
-    0,
-    0,
-    '11111111-1111-1111-1111-111111111111',
-    NOW() - INTERVAL '30 days',
-    'board',
-    'company',
-    'real_only',
-    'open',
-    TRUE,
-    NULL,
-    'pinned',
-    'announcement',
-    1
-  ),
-  (
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    'free',
-    '자유게시판',
-    '가볍게 이야기하고 소식을 나누는 공간',
-    NULL,
-    FALSE,
-    0,
-    0,
-    '22222222-2222-2222-2222-222222222222',
-    NOW() - INTERVAL '29 days',
-    'board',
-    'company',
-    'anonymous_allowed',
-    'open',
-    TRUE,
-    NULL,
-    'hot',
-    'social',
-    2
-  ),
-  (
-    'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    'qna',
-    'Q&A / 질문답변',
-    '업무, 제도, 복지 관련 궁금한 점을 묻고 답하는 게시판',
-    NULL,
-    FALSE,
-    0,
-    0,
-    '22222222-2222-2222-2222-222222222222',
-    NOW() - INTERVAL '28 days',
-    'board',
-    'company',
-    'anonymous_allowed',
-    'open',
-    TRUE,
-    NULL,
-    'latest',
-    'discussion',
-    3
-  ),
-  (
-    'dddddddd-dddd-dddd-dddd-dddddddddddd',
-    'knowledge',
-    '지식공유',
-    '문서, 팁, 노하우를 모아두는 지식형 게시판',
-    NULL,
-    FALSE,
-    0,
-    0,
-    '11111111-1111-1111-1111-111111111111',
-    NOW() - INTERVAL '27 days',
-    'board',
-    'company',
-    'real_only',
-    'open',
-    TRUE,
-    NULL,
-    'hot',
-    'knowledge',
-    4
-  ),
-  (
-    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-    'tech',
-    '기술토론',
-    '개발, 인프라, 데이터, 기술 전반을 다루는 게시판',
-    NULL,
-    FALSE,
-    0,
-    0,
-    '11111111-1111-1111-1111-111111111111',
-    NOW() - INTERVAL '26 days',
-    'board',
-    'company',
-    'real_only',
-    'open',
-    TRUE,
-    NULL,
-    'hot',
-    'discussion',
-    5
-  ),
-  (
-    'f1111111-1111-1111-1111-111111111111',
-    'culture',
-    '복지 / 문화',
-    '사내 복지, 행사, 취미 이야기를 나누는 게시판',
-    NULL,
-    FALSE,
-    0,
-    0,
-    '22222222-2222-2222-2222-222222222222',
-    NOW() - INTERVAL '25 days',
-    'board',
-    'company',
-    'anonymous_allowed',
-    'open',
-    TRUE,
-    NULL,
-    'latest',
-    'social',
-    6
-  ),
-  (
-    'f2222222-2222-2222-2222-222222222222',
-    'anon-suggest',
-    '익명 제안',
-    '익명으로 제안과 건의사항을 남기는 게시판',
-    NULL,
-    FALSE,
-    0,
-    0,
-    '11111111-1111-1111-1111-111111111111',
-    NOW() - INTERVAL '24 days',
-    'board',
-    'company',
-    'anonymous_only',
-    'open',
-    TRUE,
-    NULL,
-    'latest',
-    'discussion',
-    7
-  ),
-  (
-    'f3333333-3333-3333-3333-333333333333',
-    'anon-concern',
-    '익명 고민',
-    '익명으로 고민과 제안을 나누는 게시판',
-    NULL,
-    FALSE,
-    0,
-    0,
-    '22222222-2222-2222-2222-222222222222',
-    NOW() - INTERVAL '23 days',
-    'board',
-    'company',
-    'anonymous_only',
-    'open',
-    TRUE,
-    NULL,
-    'latest',
-    'social',
-    8
-  ),
-  (
-    'f4444444-4444-4444-4444-444444444444',
-    'space-projects',
-    '프로젝트 공간',
-    '프로젝트별 이슈, 공유, 공지를 위한 공간',
-    NULL,
-    FALSE,
-    0,
-    0,
-    '11111111-1111-1111-1111-111111111111',
-    NOW() - INTERVAL '21 days',
-    'space',
-    'project',
-    'real_only',
-    'invite',
-    TRUE,
-    NULL,
-    'latest',
-    'discussion',
-    20
-  ),
-  (
-    'f5555555-5555-5555-5555-555555555555',
-    'space-study',
-    '스터디 공간',
-    '사내 스터디 그룹을 위한 공간',
-    NULL,
-    FALSE,
-    0,
-    0,
-    '11111111-1111-1111-1111-111111111111',
-    NOW() - INTERVAL '20 days',
-    'space',
-    'interest',
-    'real_only',
-    'open',
-    TRUE,
-    NULL,
-    'latest',
-    'knowledge',
-    21
-  ),
-  (
-    'f6666666-6666-6666-6666-666666666666',
-    'space-tf',
-    'TF 공간',
-    '단기 태스크포스 전용 비공개 공간',
-    NULL,
-    FALSE,
-    0,
-    0,
-    '11111111-1111-1111-1111-111111111111',
-    NOW() - INTERVAL '19 days',
-    'space',
-    'project',
-    'real_only',
-    'invite',
-    FALSE,
-    NULL,
-    'latest',
-    'discussion',
-    22
-  ),
-  (
-    'f7777777-7777-7777-7777-777777777777',
-    'space-hobby',
-    '취미 모임',
-    '운동, 여행, 독서 같은 사내 취미 모임 공간',
-    NULL,
-    FALSE,
-    0,
-    0,
-    '22222222-2222-2222-2222-222222222222',
-    NOW() - INTERVAL '18 days',
-    'space',
-    'interest',
-    'anonymous_allowed',
-    'open',
-    TRUE,
-    NULL,
-    'latest',
-    'social',
-    23
-  )
-ON CONFLICT (id) DO UPDATE SET
-  name = EXCLUDED.name,
-  description = EXCLUDED.description,
-  icon_url = EXCLUDED.icon_url,
-  is_private = EXCLUDED.is_private,
-  created_by = EXCLUDED.created_by,
-  type = EXCLUDED.type,
-  scope = EXCLUDED.scope,
-  posting_mode = EXCLUDED.posting_mode,
-  membership_type = EXCLUDED.membership_type,
-  is_listed = EXCLUDED.is_listed,
-  parent_id = EXCLUDED.parent_id,
-  default_sort = EXCLUDED.default_sort,
-  purpose = EXCLUDED.purpose,
-  display_order = EXCLUDED.display_order;
-
--- =========================================================
--- Channel members
--- =========================================================
-INSERT INTO channel_members (channel_id, user_id, role, joined_at) VALUES
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'admin', NOW() - INTERVAL '30 days'),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '22222222-2222-2222-2222-222222222222', 'moderator', NOW() - INTERVAL '29 days'),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '33333333-3333-3333-3333-333333333333', 'member', NOW() - INTERVAL '28 days'),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '44444444-4444-4444-4444-444444444444', 'member', NOW() - INTERVAL '28 days'),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '55555555-5555-5555-5555-555555555555', 'member', NOW() - INTERVAL '27 days'),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '66666666-6666-6666-6666-666666666666', 'member', NOW() - INTERVAL '27 days'),
-
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '11111111-1111-1111-1111-111111111111', 'admin', NOW() - INTERVAL '29 days'),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '22222222-2222-2222-2222-222222222222', 'moderator', NOW() - INTERVAL '29 days'),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '33333333-3333-3333-3333-333333333333', 'member', NOW() - INTERVAL '28 days'),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '66666666-6666-6666-6666-666666666666', 'member', NOW() - INTERVAL '27 days'),
-
-  ('cccccccc-cccc-cccc-cccc-cccccccccccc', '11111111-1111-1111-1111-111111111111', 'admin', NOW() - INTERVAL '28 days'),
-  ('cccccccc-cccc-cccc-cccc-cccccccccccc', '22222222-2222-2222-2222-222222222222', 'moderator', NOW() - INTERVAL '28 days'),
-  ('cccccccc-cccc-cccc-cccc-cccccccccccc', '44444444-4444-4444-4444-444444444444', 'member', NOW() - INTERVAL '27 days'),
-  ('cccccccc-cccc-cccc-cccc-cccccccccccc', '66666666-6666-6666-6666-666666666666', 'member', NOW() - INTERVAL '27 days'),
-
-  ('dddddddd-dddd-dddd-dddd-dddddddddddd', '11111111-1111-1111-1111-111111111111', 'admin', NOW() - INTERVAL '27 days'),
-  ('dddddddd-dddd-dddd-dddd-dddddddddddd', '22222222-2222-2222-2222-222222222222', 'moderator', NOW() - INTERVAL '27 days'),
-  ('dddddddd-dddd-dddd-dddd-dddddddddddd', '33333333-3333-3333-3333-333333333333', 'member', NOW() - INTERVAL '26 days'),
-  ('dddddddd-dddd-dddd-dddd-dddddddddddd', '44444444-4444-4444-4444-444444444444', 'member', NOW() - INTERVAL '26 days'),
-  ('dddddddd-dddd-dddd-dddd-dddddddddddd', '55555555-5555-5555-5555-555555555555', 'member', NOW() - INTERVAL '26 days'),
-  ('dddddddd-dddd-dddd-dddd-dddddddddddd', '66666666-6666-6666-6666-666666666666', 'member', NOW() - INTERVAL '26 days'),
-
-  ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', '11111111-1111-1111-1111-111111111111', 'admin', NOW() - INTERVAL '26 days'),
-  ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', '33333333-3333-3333-3333-333333333333', 'member', NOW() - INTERVAL '25 days'),
-  ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', '55555555-5555-5555-5555-555555555555', 'member', NOW() - INTERVAL '25 days'),
-  ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', '66666666-6666-6666-6666-666666666666', 'member', NOW() - INTERVAL '25 days'),
-
-  ('f1111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', 'admin', NOW() - INTERVAL '25 days'),
-  ('f1111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'member', NOW() - INTERVAL '24 days'),
-  ('f1111111-1111-1111-1111-111111111111', '44444444-4444-4444-4444-444444444444', 'member', NOW() - INTERVAL '24 days'),
-  ('f1111111-1111-1111-1111-111111111111', '55555555-5555-5555-5555-555555555555', 'member', NOW() - INTERVAL '24 days'),
-  ('f1111111-1111-1111-1111-111111111111', '66666666-6666-6666-6666-666666666666', 'member', NOW() - INTERVAL '24 days'),
-
-  ('f2222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'admin', NOW() - INTERVAL '24 days'),
-  ('f2222222-2222-2222-2222-222222222222', '22222222-2222-2222-2222-222222222222', 'member', NOW() - INTERVAL '23 days'),
-  ('f2222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333', 'member', NOW() - INTERVAL '23 days'),
-
-  ('f3333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111', 'admin', NOW() - INTERVAL '23 days'),
-  ('f3333333-3333-3333-3333-333333333333', '22222222-2222-2222-2222-222222222222', 'member', NOW() - INTERVAL '23 days'),
-  ('f3333333-3333-3333-3333-333333333333', '44444444-4444-4444-4444-444444444444', 'member', NOW() - INTERVAL '22 days'),
-  ('f3333333-3333-3333-3333-333333333333', '55555555-5555-5555-5555-555555555555', 'member', NOW() - INTERVAL '22 days'),
-
-  ('f4444444-4444-4444-4444-444444444444', '11111111-1111-1111-1111-111111111111', 'admin', NOW() - INTERVAL '21 days'),
-  ('f4444444-4444-4444-4444-444444444444', '33333333-3333-3333-3333-333333333333', 'member', NOW() - INTERVAL '20 days'),
-  ('f4444444-4444-4444-4444-444444444444', '55555555-5555-5555-5555-555555555555', 'member', NOW() - INTERVAL '20 days'),
-
-  ('f5555555-5555-5555-5555-555555555555', '11111111-1111-1111-1111-111111111111', 'admin', NOW() - INTERVAL '20 days'),
-  ('f5555555-5555-5555-5555-555555555555', '22222222-2222-2222-2222-222222222222', 'member', NOW() - INTERVAL '19 days'),
-  ('f5555555-5555-5555-5555-555555555555', '33333333-3333-3333-3333-333333333333', 'member', NOW() - INTERVAL '19 days'),
-  ('f5555555-5555-5555-5555-555555555555', '44444444-4444-4444-4444-444444444444', 'member', NOW() - INTERVAL '19 days'),
-  ('f5555555-5555-5555-5555-555555555555', '66666666-6666-6666-6666-666666666666', 'member', NOW() - INTERVAL '19 days'),
-
-  ('f6666666-6666-6666-6666-666666666666', '11111111-1111-1111-1111-111111111111', 'admin', NOW() - INTERVAL '19 days'),
-  ('f6666666-6666-6666-6666-666666666666', '33333333-3333-3333-3333-333333333333', 'member', NOW() - INTERVAL '18 days'),
-  ('f6666666-6666-6666-6666-666666666666', '66666666-6666-6666-6666-666666666666', 'member', NOW() - INTERVAL '18 days'),
-
-  ('f7777777-7777-7777-7777-777777777777', '22222222-2222-2222-2222-222222222222', 'admin', NOW() - INTERVAL '18 days'),
-  ('f7777777-7777-7777-7777-777777777777', '44444444-4444-4444-4444-444444444444', 'member', NOW() - INTERVAL '17 days'),
-  ('f7777777-7777-7777-7777-777777777777', '55555555-5555-5555-5555-555555555555', 'member', NOW() - INTERVAL '17 days'),
-  ('f7777777-7777-7777-7777-777777777777', '66666666-6666-6666-6666-666666666666', 'member', NOW() - INTERVAL '17 days')
-ON CONFLICT (channel_id, user_id) DO UPDATE SET
-  role = EXCLUDED.role,
-  joined_at = EXCLUDED.joined_at;
-
--- =========================================================
--- Posts
--- =========================================================
-INSERT INTO posts (
-  id,
-  channel_id,
-  author_id,
-  is_anonymous,
-  anon_alias,
-  title,
-  content,
-  content_type,
-  media_urls,
-  link_url,
-  link_preview,
-  upvote_count,
-  downvote_count,
-  comment_count,
-  view_count,
-  flair,
-  is_pinned,
-  is_deleted,
-  hot_score,
-  created_at,
-  updated_at
-) VALUES
-  (
-    'e1111111-1111-1111-1111-111111111111',
-    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-    '11111111-1111-1111-1111-111111111111',
-    FALSE,
-    NULL,
-    '이번 주 점검 안내',
-    '이번 주 금요일 18:00~19:00에 서비스 점검이 예정되어 있습니다. 점검 시간에는 일부 기능이 잠시 제한될 수 있어요.',
-    'text',
-    ARRAY[]::text[],
-    NULL,
-    NULL,
-    24,
-    0,
-    0,
-    220,
-    'notice',
-    TRUE,
-    FALSE,
-    12.5000,
-    NOW() - INTERVAL '6 days',
-    NOW() - INTERVAL '6 days'
-  ),
-  (
-    'e2222222-2222-2222-2222-222222222222',
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    '33333333-3333-3333-3333-333333333333',
-    FALSE,
-    NULL,
-    '오늘 점심 메뉴 추천해요',
-    '다들 점심 메뉴 뭐 드실 예정인가요? 근처 새로 생긴 식당도 궁금합니다.',
-    'text',
-    ARRAY[]::text[],
-    NULL,
-    NULL,
-    11,
-    1,
-    0,
-    95,
-    'discussion',
-    FALSE,
-    FALSE,
-    9.2000,
-    NOW() - INTERVAL '5 days',
-    NOW() - INTERVAL '5 days'
-  ),
-  (
-    'e3333333-3333-3333-3333-333333333333',
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    '66666666-6666-6666-6666-666666666666',
-    FALSE,
-    NULL,
-    'VPN 접속이 느릴 때 확인할 것',
-    '사내 VPN 속도가 느릴 때는 네트워크 상태와 지역 설정을 먼저 확인해보면 도움이 됩니다.',
-    'text',
-    ARRAY[]::text[],
-    NULL,
-    NULL,
-    8,
-    0,
-    0,
-    64,
-    'question',
-    FALSE,
-    FALSE,
-    6.3000,
-    NOW() - INTERVAL '4 days',
-    NOW() - INTERVAL '4 days'
-  ),
-  (
-    'e4444444-4444-4444-4444-444444444444',
-    'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    '22222222-2222-2222-2222-222222222222',
-    FALSE,
-    NULL,
-    '복지 제도 개선 제안',
-    '이번 분기 복지 제도에 대해 만족도 설문을 받고 있어요. 불편한 점이나 개선 아이디어를 자유롭게 남겨주세요.',
-    'text',
-    ARRAY[]::text[],
-    NULL,
-    NULL,
-    18,
-    0,
-    0,
-    143,
-    'info',
-    FALSE,
-    FALSE,
-    11.0000,
-    NOW() - INTERVAL '4 days',
-    NOW() - INTERVAL '4 days'
-  ),
-  (
-    'e5555555-5555-5555-5555-555555555555',
-    'dddddddd-dddd-dddd-dddd-dddddddddddd',
-    '44444444-4444-4444-4444-444444444444',
-    TRUE,
-    '익명-2',
-    '신규 온보딩 자료가 있으면 좋겠어요',
-    '신입 입장에서 한 번에 참고할 수 있는 온보딩 페이지가 있으면 훨씬 좋을 것 같아요.',
-    'text',
-    ARRAY['https://picsum.photos/seed/lunch/1200/800']::text[],
-    NULL,
-    NULL,
-    5,
-    0,
-    0,
-    72,
-    'daily',
-    FALSE,
-    FALSE,
-    4.1000,
-    NOW() - INTERVAL '3 days',
-    NOW() - INTERVAL '3 days'
-  ),
-  (
-    'e6666666-6666-6666-6666-666666666666',
-    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-    '55555555-5555-5555-5555-555555555555',
-    FALSE,
-    NULL,
-    '사내 행사 사진 공유',
-    '지난 행사 사진을 정리해두었습니다. 참여해주신 분들 모두 감사합니다!',
-    'text',
-    ARRAY[]::text[],
-    NULL,
-    NULL,
-    13,
-    0,
-    0,
-    88,
-    'discussion',
-    FALSE,
-    FALSE,
-    7.8000,
-    NOW() - INTERVAL '3 days',
-    NOW() - INTERVAL '3 days'
-  ),
-  (
-    'e7777777-7777-7777-7777-777777777777',
-    'f4444444-4444-4444-4444-444444444444',
-    '33333333-3333-3333-3333-333333333333',
-    FALSE,
-    NULL,
-    'Q2 OKR 공유합니다',
-    '이번 분기 목표를 정리해서 공유합니다. 팀별로 참고해주시면 좋겠습니다.',
-    'text',
-    ARRAY[]::text[],
-    'https://docs.company.demo/okr-q2',
-    '{"title":"Q2 OKR 공유","description":"이번 분기 목표를 정리한 문서입니다.","url":"https://docs.company.demo/okr-q2"}'::jsonb,
-    6,
-    0,
-    0,
-    41,
-    'info',
-    FALSE,
-    FALSE,
-    3.4000,
-    NOW() - INTERVAL '2 days',
-    NOW() - INTERVAL '2 days'
-  ),
-  (
-    'e8888888-8888-8888-8888-888888888888',
-    'f7777777-7777-7777-7777-777777777777',
-    '11111111-1111-1111-1111-111111111111',
-    FALSE,
-    NULL,
-    '취미 모임 일정 조사',
-    '저녁 러닝 모임을 열어보려고 합니다. 참여 가능하신 분들은 댓글 남겨주세요.',
-    'text',
-    ARRAY[]::text[],
-    NULL,
-    NULL,
-    9,
-    0,
-    0,
-    57,
-    'info',
-    FALSE,
-    FALSE,
-    5.9000,
-    NOW() - INTERVAL '1 day',
-    NOW() - INTERVAL '1 day'
-  )
-ON CONFLICT (id) DO UPDATE SET
-  channel_id = EXCLUDED.channel_id,
-  author_id = EXCLUDED.author_id,
-  is_anonymous = EXCLUDED.is_anonymous,
-  anon_alias = EXCLUDED.anon_alias,
-  title = EXCLUDED.title,
-  content = EXCLUDED.content,
-  content_type = EXCLUDED.content_type,
-  media_urls = EXCLUDED.media_urls,
-  link_url = EXCLUDED.link_url,
-  link_preview = EXCLUDED.link_preview,
-  upvote_count = EXCLUDED.upvote_count,
-  downvote_count = EXCLUDED.downvote_count,
-  comment_count = EXCLUDED.comment_count,
-  view_count = EXCLUDED.view_count,
-  flair = EXCLUDED.flair,
-  is_pinned = EXCLUDED.is_pinned,
-  is_deleted = EXCLUDED.is_deleted,
-  hot_score = EXCLUDED.hot_score,
-  updated_at = EXCLUDED.updated_at;
-
--- =========================================================
--- Comments
--- =========================================================
-INSERT INTO comments (
-  id,
-  post_id,
-  author_id,
-  parent_id,
-  is_anonymous,
-  anon_number,
-  content,
-  upvote_count,
-  is_deleted,
-  depth,
-  created_at
-) VALUES
-  (
-    'c1111111-1111-1111-1111-111111111111',
-    'e1111111-1111-1111-1111-111111111111',
-    '22222222-2222-2222-2222-222222222222',
-    NULL,
-    FALSE,
-    NULL,
-    '안내 감사합니다. 점검 전에 미리 작업 마무리하겠습니다.',
-    4,
-    FALSE,
-    0,
-    NOW() - INTERVAL '5 days 23 hours'
-  ),
-  (
-    'c2222222-2222-2222-2222-222222222222',
-    'e1111111-1111-1111-1111-111111111111',
-    '11111111-1111-1111-1111-111111111111',
-    'c1111111-1111-1111-1111-111111111111',
-    FALSE,
-    NULL,
-    '감사합니다. 점검 중 공지사항은 별도 채널에 바로 올릴게요.',
-    3,
-    FALSE,
-    1,
-    NOW() - INTERVAL '5 days 22 hours'
-  ),
-  (
-    'c3333333-3333-3333-3333-333333333333',
-    'e2222222-2222-2222-2222-222222222222',
-    '66666666-6666-6666-6666-666666666666',
-    NULL,
-    FALSE,
-    NULL,
-    '저는 오늘 국밥 생각 중인데, 같이 가실 분 있나요?',
-    5,
-    FALSE,
-    0,
-    NOW() - INTERVAL '4 days 20 hours'
-  ),
-  (
-    'c4444444-4444-4444-4444-444444444444',
-    'e2222222-2222-2222-2222-222222222222',
-    '33333333-3333-3333-3333-333333333333',
-    'c3333333-3333-3333-3333-333333333333',
-    FALSE,
-    NULL,
-    '저도 좋아요. 점심시간 전에 메뉴 정해두죠.',
-    2,
-    FALSE,
-    1,
-    NOW() - INTERVAL '4 days 18 hours'
-  ),
-  (
-    'c5555555-5555-5555-5555-555555555555',
-    'e5555555-5555-5555-5555-555555555555',
-    '55555555-5555-5555-5555-555555555555',
-    NULL,
-    TRUE,
-    1,
-    '온보딩 자료 있으면 정말 도움될 것 같아요. 새로 입사한 분들도 바로 찾기 쉬울 듯합니다.',
-    1,
-    FALSE,
-    0,
-    NOW() - INTERVAL '2 days 12 hours'
-  ),
-  (
-    'c6666666-6666-6666-6666-666666666666',
-    'e6666666-6666-6666-6666-666666666666',
-    '44444444-4444-4444-4444-444444444444',
-    NULL,
-    FALSE,
-    NULL,
-    '사진 공유 감사합니다. 다음 행사도 기대돼요!',
-    2,
-    FALSE,
-    0,
-    NOW() - INTERVAL '2 days 8 hours'
-  ),
-  (
-    'c7777777-7777-7777-7777-777777777777',
-    'e7777777-7777-7777-7777-777777777777',
-    '22222222-2222-2222-2222-222222222222',
-    NULL,
-    FALSE,
-    NULL,
-    '문서 확인했습니다. 목표가 명확해서 좋네요.',
-    4,
-    FALSE,
-    0,
-    NOW() - INTERVAL '1 day 18 hours'
-  ),
-  (
-    'c8888888-8888-8888-8888-888888888888',
-    'e8888888-8888-8888-8888-888888888888',
-    '66666666-6666-6666-6666-666666666666',
-    NULL,
-    FALSE,
-    NULL,
-    '러닝 모임 참여합니다. 시간만 맞으면 꼭 갈게요.',
-    2,
-    FALSE,
-    0,
-    NOW() - INTERVAL '12 hours'
-  )
-ON CONFLICT (id) DO UPDATE SET
-  post_id = EXCLUDED.post_id,
-  author_id = EXCLUDED.author_id,
-  parent_id = EXCLUDED.parent_id,
-  is_anonymous = EXCLUDED.is_anonymous,
-  anon_number = EXCLUDED.anon_number,
-  content = EXCLUDED.content,
-  upvote_count = EXCLUDED.upvote_count,
-  is_deleted = EXCLUDED.is_deleted,
-  depth = EXCLUDED.depth,
-  created_at = EXCLUDED.created_at;
-
--- =========================================================
--- Votes
--- =========================================================
-INSERT INTO votes (id, user_id, target_type, target_id, vote_type, created_at) VALUES
-  ('b1111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'post', 'e1111111-1111-1111-1111-111111111111', 'up', NOW() - INTERVAL '5 days'),
-  ('b2222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333', 'post', 'e2222222-2222-2222-2222-222222222222', 'up', NOW() - INTERVAL '4 days'),
-  ('b3333333-3333-3333-3333-333333333333', '44444444-4444-4444-4444-444444444444', 'comment', 'c3333333-3333-3333-3333-333333333333', 'up', NOW() - INTERVAL '4 days'),
-  ('b4444444-4444-4444-4444-444444444444', '66666666-6666-6666-6666-666666666666', 'post', 'e8888888-8888-8888-8888-888888888888', 'up', NOW() - INTERVAL '12 hours')
-ON CONFLICT (id) DO UPDATE SET
-  user_id = EXCLUDED.user_id,
-  target_type = EXCLUDED.target_type,
-  target_id = EXCLUDED.target_id,
-  vote_type = EXCLUDED.vote_type,
-  created_at = EXCLUDED.created_at;
-
--- =========================================================
--- Reactions
--- =========================================================
-INSERT INTO reactions (id, user_id, post_id, comment_id, emoji, created_at) VALUES
-  ('c1111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'e1111111-1111-1111-1111-111111111111', NULL, '👍', NOW() - INTERVAL '5 days'),
-  ('c2222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333', 'e2222222-2222-2222-2222-222222222222', NULL, '❤️', NOW() - INTERVAL '4 days'),
-  ('c3333333-3333-3333-3333-333333333334', '44444444-4444-4444-4444-444444444444', NULL, 'c3333333-3333-3333-3333-333333333333', '👏', NOW() - INTERVAL '4 days'),
-  ('c4444444-4444-4444-4444-444444444445', '66666666-6666-6666-6666-666666666666', 'e8888888-8888-8888-8888-888888888888', NULL, '🔥', NOW() - INTERVAL '12 hours')
-ON CONFLICT (id) DO UPDATE SET
-  user_id = EXCLUDED.user_id,
-  post_id = EXCLUDED.post_id,
-  comment_id = EXCLUDED.comment_id,
-  emoji = EXCLUDED.emoji,
-  created_at = EXCLUDED.created_at;
-
--- =========================================================
--- Notifications
--- =========================================================
-INSERT INTO notifications (
-  id,
-  recipient_id,
-  actor_id,
-  post_id,
-  type,
-  target_type,
-  target_id,
-  message,
-  is_read,
-  created_at
-) VALUES
-  (
-    'a1111111-1111-1111-1111-111111111111',
-    '11111111-1111-1111-1111-111111111111',
-    '22222222-2222-2222-2222-222222222222',
-    'e1111111-1111-1111-1111-111111111111',
-    'comment',
-    'post',
-    'e1111111-1111-1111-1111-111111111111',
-    '새 댓글이 달렸습니다.',
-    FALSE,
-    NOW() - INTERVAL '5 days 23 hours'
-  ),
-  (
-    'a2222222-2222-2222-2222-222222222222',
-    '22222222-2222-2222-2222-222222222222',
-    '11111111-1111-1111-1111-111111111111',
-    'e1111111-1111-1111-1111-111111111111',
-    'reply',
-    'comment',
-    'c1111111-1111-1111-1111-111111111111',
-    '내 댓글에 답글이 달렸습니다.',
-    FALSE,
-    NOW() - INTERVAL '5 days 22 hours'
-  ),
-  (
-    'a3333333-3333-3333-3333-333333333333',
-    '33333333-3333-3333-3333-333333333333',
-    '66666666-6666-6666-6666-666666666666',
-    'e2222222-2222-2222-2222-222222222222',
-    'comment',
-    'post',
-    'e2222222-2222-2222-2222-222222222222',
-    '새 댓글이 달렸습니다.',
-    FALSE,
-    NOW() - INTERVAL '4 days 20 hours'
-  ),
-  (
-    'a4444444-4444-4444-4444-444444444444',
-    '66666666-6666-6666-6666-666666666666',
-    '33333333-3333-3333-3333-333333333333',
-    'e2222222-2222-2222-2222-222222222222',
-    'reply',
-    'comment',
-    'c3333333-3333-3333-3333-333333333333',
-    '내 댓글에 답글이 달렸습니다.',
-    FALSE,
-    NOW() - INTERVAL '4 days 18 hours'
-  )
-ON CONFLICT (id) DO UPDATE SET
-  recipient_id = EXCLUDED.recipient_id,
-  actor_id = EXCLUDED.actor_id,
-  post_id = EXCLUDED.post_id,
-  type = EXCLUDED.type,
-  target_type = EXCLUDED.target_type,
-  target_id = EXCLUDED.target_id,
-  message = EXCLUDED.message,
-  is_read = EXCLUDED.is_read,
-  created_at = EXCLUDED.created_at;
-
--- =========================================================
--- Channel requests
--- =========================================================
-INSERT INTO channel_requests (
-  id,
-  name,
-  slug,
-  description,
-  reason,
-  status,
-  requested_by,
-  reviewed_by,
-  reviewed_at,
-  created_channel_id,
-  created_at,
-  requested_type,
-  requested_scope,
-  requested_posting_mode,
-  requested_membership_type
-) VALUES
-  (
-    'd1111111-1111-1111-1111-111111111111',
-    '데이터팀 게시판',
-    'data-team',
-    '데이터팀 전용 질문 및 공유 공간',
-    '팀 별도 게시판이 있으면 협업이 편해집니다.',
-    'pending',
-    '44444444-4444-4444-4444-444444444444',
-    NULL,
-    NULL,
-    NULL,
-    NOW() - INTERVAL '1 day',
-    'board',
-    'department',
-    'real_only',
-    'request'
-  ),
-  (
-    'd2222222-2222-2222-2222-222222222222',
-    '러닝 모임 공간',
-    'running-club',
-    '사내 러닝 모임을 위한 소규모 공간',
-    '취미 기반 모임을 새로 열고 싶습니다.',
-    'approved',
-    '55555555-5555-5555-5555-555555555555',
-    '11111111-1111-1111-1111-111111111111',
-    NOW() - INTERVAL '2 hours',
-    'f7777777-7777-7777-7777-777777777777',
-    NOW() - INTERVAL '3 days',
-    'space',
-    'interest',
-    'anonymous_allowed',
-    'open'
-  ),
-  (
-    'd3333333-3333-3333-3333-333333333333',
-    '비공개 연구실',
-    'private-lab',
-    '실험적인 기능을 테스트하는 비공개 공간',
-    '민감한 실험 데이터를 보호하고 싶습니다.',
-    'rejected',
-    '33333333-3333-3333-3333-333333333333',
-    '11111111-1111-1111-1111-111111111111',
-    NOW() - INTERVAL '12 hours',
-    NULL,
-    NOW() - INTERVAL '4 days',
-    'space',
-    'project',
-    'real_only',
-    'invite'
-  )
-ON CONFLICT (id) DO UPDATE SET
-  name = EXCLUDED.name,
-  slug = EXCLUDED.slug,
-  description = EXCLUDED.description,
-  reason = EXCLUDED.reason,
-  status = EXCLUDED.status,
-  requested_by = EXCLUDED.requested_by,
-  reviewed_by = EXCLUDED.reviewed_by,
-  reviewed_at = EXCLUDED.reviewed_at,
-  created_channel_id = EXCLUDED.created_channel_id,
-  created_at = EXCLUDED.created_at,
-  requested_type = EXCLUDED.requested_type,
-  requested_scope = EXCLUDED.requested_scope,
-  requested_posting_mode = EXCLUDED.requested_posting_mode,
-  requested_membership_type = EXCLUDED.requested_membership_type;
-
--- =========================================================
--- Recalculate counters
--- =========================================================
-UPDATE channels c
-SET member_count = COALESCE(m.member_count, 0)
-FROM (
-  SELECT channel_id, COUNT(*)::int AS member_count
-  FROM channel_members
-  GROUP BY channel_id
-) m
-WHERE c.id = m.channel_id;
-
-UPDATE channels c
-SET member_count = 0
-WHERE NOT EXISTS (
-  SELECT 1
-  FROM channel_members cm
-  WHERE cm.channel_id = c.id
-);
-
-UPDATE channels c
-SET post_count = COALESCE(p.post_count, 0)
-FROM (
-  SELECT channel_id, COUNT(*)::int AS post_count
-  FROM posts
-  WHERE NOT is_deleted
-  GROUP BY channel_id
-) p
-WHERE c.id = p.channel_id;
-
-UPDATE channels c
-SET post_count = 0
-WHERE NOT EXISTS (
-  SELECT 1
-  FROM posts p
-  WHERE p.channel_id = c.id AND NOT p.is_deleted
-);
-
-UPDATE posts p
-SET comment_count = COALESCE(cmt.comment_count, 0)
-FROM (
-  SELECT post_id, COUNT(*)::int AS comment_count
-  FROM comments
-  WHERE NOT is_deleted
-  GROUP BY post_id
-) cmt
-WHERE p.id = cmt.post_id;
-
-UPDATE posts p
-SET comment_count = 0
-WHERE NOT EXISTS (
-  SELECT 1
-  FROM comments c
-  WHERE c.post_id = p.id AND NOT c.is_deleted
-);
+      'notice','free','qna','knowledge','tech','culture','anon-suggest','anon-concern',
+      'space-projects','space-study','space-tf','space-hobby',
+      'anonymous','praise','ideas','hhi-board','ksoe-board','hdec-board',
+      'hshi-board','hmms-board','hhce-board','club-hiking','club-reading',
+      'club-fitness','club-wine','club-golf','club-photography','club-gaming',
+      'club-cooking','blind-date','stock-market','restaurant','house-info',
+      'car-talk','travel','secondhand','parenting','career','wfh',
+      'tech-stack','tool-review','onboarding','confess','salary','boss-story','work-life'
+    );
+END $$;
 
 COMMIT;
+
+-- =============================================================
+-- PART 1: AUTH USERS (40명 HD현대 그룹 계열사)
+-- =============================================================
+BEGIN;
+
+INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
+  email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+VALUES
+-- HD현대중공업 (U01-U10)
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000001','authenticated','authenticated',
+ 'minjun.kim@hhi.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '60 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"김민준"}'::jsonb, NOW()-INTERVAL '60 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000002','authenticated','authenticated',
+ 'seoyeon.lee@hhi.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '55 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"이서연"}'::jsonb, NOW()-INTERVAL '55 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000003','authenticated','authenticated',
+ 'jihoon.park@hhi.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '50 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"박지훈"}'::jsonb, NOW()-INTERVAL '50 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000004','authenticated','authenticated',
+ 'yujin.choi@hhi.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '48 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"최유진"}'::jsonb, NOW()-INTERVAL '48 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000005','authenticated','authenticated',
+ 'hyeonwoo.jung@hhi.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '45 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"정현우"}'::jsonb, NOW()-INTERVAL '45 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000006','authenticated','authenticated',
+ 'subin.han@hhi.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '40 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"한수빈"}'::jsonb, NOW()-INTERVAL '40 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000007','authenticated','authenticated',
+ 'junseo.oh@hhi.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '38 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"오준서"}'::jsonb, NOW()-INTERVAL '38 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000008','authenticated','authenticated',
+ 'chaewon.lim@hhi.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '36 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"임채원"}'::jsonb, NOW()-INTERVAL '36 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000009','authenticated','authenticated',
+ 'nayeon.song@hhi.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '34 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"송나연"}'::jsonb, NOW()-INTERVAL '34 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000010','authenticated','authenticated',
+ 'taeyang.yoon@hhi.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '32 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"윤태양"}'::jsonb, NOW()-INTERVAL '32 days', NOW()),
+-- HD한국조선해양 (U11-U16)
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000011','authenticated','authenticated',
+ 'yerin.kang@ksoe.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '55 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"강예린"}'::jsonb, NOW()-INTERVAL '55 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000012','authenticated','authenticated',
+ 'donghyeok.shin@ksoe.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '52 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"신동혁"}'::jsonb, NOW()-INTERVAL '52 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000013','authenticated','authenticated',
+ 'mirae.hong@ksoe.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '49 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"홍미래"}'::jsonb, NOW()-INTERVAL '49 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000014','authenticated','authenticated',
+ 'sungmin.kwon@ksoe.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '46 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"권성민"}'::jsonb, NOW()-INTERVAL '46 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000015','authenticated','authenticated',
+ 'jia.bae@ksoe.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '43 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"배지아"}'::jsonb, NOW()-INTERVAL '43 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000016','authenticated','authenticated',
+ 'junhyeok.bang@ksoe.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '41 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"방준혁"}'::jsonb, NOW()-INTERVAL '41 days', NOW()),
+-- HD현대일렉트릭 (U17-U22)
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000017','authenticated','authenticated',
+ 'haeun.ryu@hdec.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '57 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"류하은"}'::jsonb, NOW()-INTERVAL '57 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000018','authenticated','authenticated',
+ 'sungjae.moon@hdec.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '54 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"문성재"}'::jsonb, NOW()-INTERVAL '54 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000019','authenticated','authenticated',
+ 'sua.jang@hdec.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '51 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"장수아"}'::jsonb, NOW()-INTERVAL '51 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000020','authenticated','authenticated',
+ 'minseok.ko@hdec.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '47 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"고민석"}'::jsonb, NOW()-INTERVAL '47 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000021','authenticated','authenticated',
+ 'jiwon.baek@hdec.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '44 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"백지원"}'::jsonb, NOW()-INTERVAL '44 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000022','authenticated','authenticated',
+ 'taejun.eom@hdec.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '42 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"엄태준"}'::jsonb, NOW()-INTERVAL '42 days', NOW()),
+-- HD삼호중공업 (U23-U28)
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000023','authenticated','authenticated',
+ 'chaeyoung.ahn@hshi.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '53 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"안채영"}'::jsonb, NOW()-INTERVAL '53 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000024','authenticated','authenticated',
+ 'hyeonjin.yu@hshi.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '50 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"유현진"}'::jsonb, NOW()-INTERVAL '50 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000025','authenticated','authenticated',
+ 'yena.cho@hshi.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '46 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"조예나"}'::jsonb, NOW()-INTERVAL '46 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000026','authenticated','authenticated',
+ 'minjun.hwang@hshi.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '43 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"황민준"}'::jsonb, NOW()-INTERVAL '43 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000027','authenticated','authenticated',
+ 'seoyeon.ki@hshi.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '40 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"기서연"}'::jsonb, NOW()-INTERVAL '40 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000028','authenticated','authenticated',
+ 'jaehyeok.shim@hshi.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '38 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"심재혁"}'::jsonb, NOW()-INTERVAL '38 days', NOW()),
+-- HD현대마린솔루션 (U29-U34)
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000029','authenticated','authenticated',
+ 'yejin.jin@hmms.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '58 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"진예진"}'::jsonb, NOW()-INTERVAL '58 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000030','authenticated','authenticated',
+ 'gihyeon.nam@hmms.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '56 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"남기현"}'::jsonb, NOW()-INTERVAL '56 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000031','authenticated','authenticated',
+ 'subin.gu@hmms.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '53 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"구수빈"}'::jsonb, NOW()-INTERVAL '53 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000032','authenticated','authenticated',
+ 'minjae.hyeon@hmms.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '50 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"현민재"}'::jsonb, NOW()-INTERVAL '50 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000033','authenticated','authenticated',
+ 'chaeeun.noh@hmms.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '47 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"노채은"}'::jsonb, NOW()-INTERVAL '47 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000034','authenticated','authenticated',
+ 'seokhun.bong@hmms.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '44 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"봉석훈"}'::jsonb, NOW()-INTERVAL '44 days', NOW()),
+-- HD건설기계 (U35-U38)
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000035','authenticated','authenticated',
+ 'daeun.won@hce.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '59 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"원다은"}'::jsonb, NOW()-INTERVAL '59 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000036','authenticated','authenticated',
+ 'junhyeok.pyo@hce.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '56 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"표준혁"}'::jsonb, NOW()-INTERVAL '56 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000037','authenticated','authenticated',
+ 'hana.seok@hce.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '52 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"석하나"}'::jsonb, NOW()-INTERVAL '52 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000038','authenticated','authenticated',
+ 'minho.gil@hce.hd', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '48 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"길민호"}'::jsonb, NOW()-INTERVAL '48 days', NOW()),
+-- HD현대 본사 (U39-U40)
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000039','authenticated','authenticated',
+ 'jinsu.yeo@hd.co', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '90 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"여진수"}'::jsonb, NOW()-INTERVAL '90 days', NOW()),
+('00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000040','authenticated','authenticated',
+ 'yeeun.do@hd.co', crypt('Demo1234!', gen_salt('bf')), NOW()-INTERVAL '85 days',
+ '{"provider":"email","providers":["email"]}'::jsonb,'{"name":"도예은"}'::jsonb, NOW()-INTERVAL '85 days', NOW())
+ON CONFLICT (id) DO NOTHING;
+
+-- =============================================================
+-- PART 2: PROFILES
+-- =============================================================
+INSERT INTO profiles (id, email, display_name, role, department, job_title, trust_score, is_verified, anonymous_seed, created_at, updated_at)
+VALUES
+-- HD현대중공업
+('00000000-0000-0000-0000-000000000001','minjun.kim@hhi.hd','김민준','member','선박설계팀','과장',72,true,gen_random_uuid(),NOW()-INTERVAL '60 days',NOW()),
+('00000000-0000-0000-0000-000000000002','seoyeon.lee@hhi.hd','이서연','member','IT전략팀','대리',58,true,gen_random_uuid(),NOW()-INTERVAL '55 days',NOW()),
+('00000000-0000-0000-0000-000000000003','jihoon.park@hhi.hd','박지훈','member','생산기술팀','차장',85,true,gen_random_uuid(),NOW()-INTERVAL '50 days',NOW()),
+('00000000-0000-0000-0000-000000000004','yujin.choi@hhi.hd','최유진','member','HR팀','대리',64,true,gen_random_uuid(),NOW()-INTERVAL '48 days',NOW()),
+('00000000-0000-0000-0000-000000000005','hyeonwoo.jung@hhi.hd','정현우','member','해양사업팀','부장',91,true,gen_random_uuid(),NOW()-INTERVAL '45 days',NOW()),
+('00000000-0000-0000-0000-000000000006','subin.han@hhi.hd','한수빈','member','경영기획팀','사원',36,true,gen_random_uuid(),NOW()-INTERVAL '40 days',NOW()),
+('00000000-0000-0000-0000-000000000007','junseo.oh@hhi.hd','오준서','member','DevOps팀','과장',78,true,gen_random_uuid(),NOW()-INTERVAL '38 days',NOW()),
+('00000000-0000-0000-0000-000000000008','chaewon.lim@hhi.hd','임채원','member','재무팀','대리',55,true,gen_random_uuid(),NOW()-INTERVAL '36 days',NOW()),
+('00000000-0000-0000-0000-000000000009','nayeon.song@hhi.hd','송나연','member','마케팅팀','과장',69,true,gen_random_uuid(),NOW()-INTERVAL '34 days',NOW()),
+('00000000-0000-0000-0000-000000000010','taeyang.yoon@hhi.hd','윤태양','member','구매팀','차장',82,true,gen_random_uuid(),NOW()-INTERVAL '32 days',NOW()),
+-- HD한국조선해양
+('00000000-0000-0000-0000-000000000011','yerin.kang@ksoe.hd','강예린','member','해양플랜트팀','과장',74,true,gen_random_uuid(),NOW()-INTERVAL '55 days',NOW()),
+('00000000-0000-0000-0000-000000000012','donghyeok.shin@ksoe.hd','신동혁','member','선박설계팀','대리',61,true,gen_random_uuid(),NOW()-INTERVAL '52 days',NOW()),
+('00000000-0000-0000-0000-000000000013','mirae.hong@ksoe.hd','홍미래','member','IT팀','사원',40,true,gen_random_uuid(),NOW()-INTERVAL '49 days',NOW()),
+('00000000-0000-0000-0000-000000000014','sungmin.kwon@ksoe.hd','권성민','member','경영기획팀','부장',88,true,gen_random_uuid(),NOW()-INTERVAL '46 days',NOW()),
+('00000000-0000-0000-0000-000000000015','jia.bae@ksoe.hd','배지아','member','HR팀','대리',57,true,gen_random_uuid(),NOW()-INTERVAL '43 days',NOW()),
+('00000000-0000-0000-0000-000000000016','junhyeok.bang@ksoe.hd','방준혁','member','기술연구팀','과장',76,true,gen_random_uuid(),NOW()-INTERVAL '41 days',NOW()),
+-- HD현대일렉트릭
+('00000000-0000-0000-0000-000000000017','haeun.ryu@hdec.hd','류하은','member','전력변환팀','대리',63,true,gen_random_uuid(),NOW()-INTERVAL '57 days',NOW()),
+('00000000-0000-0000-0000-000000000018','sungjae.moon@hdec.hd','문성재','member','영업팀','과장',79,true,gen_random_uuid(),NOW()-INTERVAL '54 days',NOW()),
+('00000000-0000-0000-0000-000000000019','sua.jang@hdec.hd','장수아','member','IT팀','사원',38,true,gen_random_uuid(),NOW()-INTERVAL '51 days',NOW()),
+('00000000-0000-0000-0000-000000000020','minseok.ko@hdec.hd','고민석','member','생산팀','차장',84,true,gen_random_uuid(),NOW()-INTERVAL '47 days',NOW()),
+('00000000-0000-0000-0000-000000000021','jiwon.baek@hdec.hd','백지원','member','품질관리팀','대리',60,true,gen_random_uuid(),NOW()-INTERVAL '44 days',NOW()),
+('00000000-0000-0000-0000-000000000022','taejun.eom@hdec.hd','엄태준','member','경영지원팀','과장',71,true,gen_random_uuid(),NOW()-INTERVAL '42 days',NOW()),
+-- HD삼호중공업
+('00000000-0000-0000-0000-000000000023','chaeyoung.ahn@hshi.hd','안채영','member','선각팀','사원',36,true,gen_random_uuid(),NOW()-INTERVAL '53 days',NOW()),
+('00000000-0000-0000-0000-000000000024','hyeonjin.yu@hshi.hd','유현진','member','IT팀','대리',54,true,gen_random_uuid(),NOW()-INTERVAL '50 days',NOW()),
+('00000000-0000-0000-0000-000000000025','yena.cho@hshi.hd','조예나','member','도장팀','과장',67,true,gen_random_uuid(),NOW()-INTERVAL '46 days',NOW()),
+('00000000-0000-0000-0000-000000000026','minjun.hwang@hshi.hd','황민준','member','생산기술팀','차장',83,true,gen_random_uuid(),NOW()-INTERVAL '43 days',NOW()),
+('00000000-0000-0000-0000-000000000027','seoyeon.ki@hshi.hd','기서연','member','HR팀','대리',59,true,gen_random_uuid(),NOW()-INTERVAL '40 days',NOW()),
+('00000000-0000-0000-0000-000000000028','jaehyeok.shim@hshi.hd','심재혁','member','안전환경팀','과장',75,true,gen_random_uuid(),NOW()-INTERVAL '38 days',NOW()),
+-- HD현대마린솔루션
+('00000000-0000-0000-0000-000000000029','yejin.jin@hmms.hd','진예진','member','서비스팀','대리',62,true,gen_random_uuid(),NOW()-INTERVAL '58 days',NOW()),
+('00000000-0000-0000-0000-000000000030','gihyeon.nam@hmms.hd','남기현','member','영업팀','과장',77,true,gen_random_uuid(),NOW()-INTERVAL '56 days',NOW()),
+('00000000-0000-0000-0000-000000000031','subin.gu@hmms.hd','구수빈','member','IT팀','사원',42,true,gen_random_uuid(),NOW()-INTERVAL '53 days',NOW()),
+('00000000-0000-0000-0000-000000000032','minjae.hyeon@hmms.hd','현민재','member','솔루션개발팀','대리',65,true,gen_random_uuid(),NOW()-INTERVAL '50 days',NOW()),
+('00000000-0000-0000-0000-000000000033','chaeeun.noh@hmms.hd','노채은','member','경영기획팀','과장',73,true,gen_random_uuid(),NOW()-INTERVAL '47 days',NOW()),
+('00000000-0000-0000-0000-000000000034','seokhun.bong@hmms.hd','봉석훈','member','기술팀','차장',87,true,gen_random_uuid(),NOW()-INTERVAL '44 days',NOW()),
+-- HD건설기계
+('00000000-0000-0000-0000-000000000035','daeun.won@hce.hd','원다은','member','영업팀','대리',56,true,gen_random_uuid(),NOW()-INTERVAL '59 days',NOW()),
+('00000000-0000-0000-0000-000000000036','junhyeok.pyo@hce.hd','표준혁','member','개발팀','과장',80,true,gen_random_uuid(),NOW()-INTERVAL '56 days',NOW()),
+('00000000-0000-0000-0000-000000000037','hana.seok@hce.hd','석하나','member','HR팀','사원',36,true,gen_random_uuid(),NOW()-INTERVAL '52 days',NOW()),
+('00000000-0000-0000-0000-000000000038','minho.gil@hce.hd','길민호','member','생산팀','차장',82,true,gen_random_uuid(),NOW()-INTERVAL '48 days',NOW()),
+-- HD현대 본사
+('00000000-0000-0000-0000-000000000039','jinsu.yeo@hd.co','여진수','admin','전략기획팀','이사',96,true,gen_random_uuid(),NOW()-INTERVAL '90 days',NOW()),
+('00000000-0000-0000-0000-000000000040','yeeun.do@hd.co','도예은','member','커뮤니케이션팀','과장',70,true,gen_random_uuid(),NOW()-INTERVAL '85 days',NOW())
+ON CONFLICT (id) DO NOTHING;
+
+COMMIT;
+
+-- =============================================================
+-- PART 3: CHANNELS (38개)
+-- CH01-CH07: 전사 공통 게시판
+-- CH08-CH13: 그룹사별 게시판
+-- CH14-CH21: 소모임/동호회 스페이스
+-- CH22-CH29: 생활/재미 게시판
+-- CH30-CH34: 업무/커리어 게시판
+-- CH35-CH38: 익명 전용 게시판
+-- =============================================================
+BEGIN;
+
+INSERT INTO channels (id, slug, name, description, type, scope, posting_mode, membership_type,
+  is_listed, is_private, default_sort, purpose, display_order, member_count, post_count, created_by, created_at)
+VALUES
+-- ── 전사 공통 게시판 ──
+('10000000-0000-0000-0000-000000000001','notice','회사 공지',
+ '임원진 및 공식 발표사항을 공유하는 공지 채널입니다. 중요 안내사항을 놓치지 마세요.',
+ 'board','company','real_only','open',true,false,'pinned','announcement',1,2845,48,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '90 days'),
+
+('10000000-0000-0000-0000-000000000002','free','자유게시판',
+ '업무와 관련 없는 다양한 이야기를 나누는 공간입니다. 취미, 일상, 관심사 무엇이든 OK!',
+ 'board','company','anonymous_allowed','open',true,false,'hot','social',2,2845,312,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '90 days'),
+
+('10000000-0000-0000-0000-000000000003','anonymous','익명게시판',
+ '완전 익명으로 솔직한 의견을 나눌 수 있는 공간입니다. 서로 존중하는 문화를 만들어요.',
+ 'board','company','anonymous_only','open',true,false,'hot','discussion',3,2845,287,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '90 days'),
+
+('10000000-0000-0000-0000-000000000004','qna','질문과 답변',
+ '업무, 복지, 회사 생활에 관한 궁금증을 해결해 드립니다. 어떤 질문이든 환영합니다!',
+ 'board','company','anonymous_allowed','open',true,false,'latest','discussion',4,2845,198,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '88 days'),
+
+('10000000-0000-0000-0000-000000000005','knowledge','정보공유',
+ '업무에 유용한 정보, 노하우, 외부 콘텐츠를 공유하는 게시판입니다.',
+ 'board','company','anonymous_allowed','open',true,false,'hot','knowledge',5,2845,156,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '88 days'),
+
+('10000000-0000-0000-0000-000000000006','praise','칭찬합시다',
+ '동료의 좋은 점을 실명으로 칭찬해보세요. 긍정적인 문화를 함께 만들어 갑니다.',
+ 'board','company','real_only','open',true,false,'latest','social',6,2845,89,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '88 days'),
+
+('10000000-0000-0000-0000-000000000007','ideas','아이디어 제안',
+ '업무 개선, 복지 향상, 문화 혁신을 위한 아이디어를 자유롭게 제안해주세요.',
+ 'board','company','anonymous_allowed','open',true,false,'hot','discussion',7,2845,134,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '87 days'),
+
+-- ── 그룹사별 게시판 ──
+('10000000-0000-0000-0000-000000000008','hhi-board','HD현대중공업',
+ 'HD현대중공업 임직원들의 소식, 업무 이야기, 울산 생활 정보를 나눕니다.',
+ 'board','subsidiary','anonymous_allowed','open',true,false,'latest','discussion',10,1200,203,
+ '00000000-0000-0000-0000-000000000001',NOW()-INTERVAL '85 days'),
+
+('10000000-0000-0000-0000-000000000009','ksoe-board','HD한국조선해양',
+ 'HD한국조선해양(KSOE) 구성원들의 이야기를 나누는 공간입니다.',
+ 'board','subsidiary','anonymous_allowed','open',true,false,'latest','discussion',11,680,145,
+ '00000000-0000-0000-0000-000000000011',NOW()-INTERVAL '85 days'),
+
+('10000000-0000-0000-0000-000000000010','hdec-board','HD현대일렉트릭',
+ 'HD현대일렉트릭 구성원 전용 게시판입니다. 창원/경산 생활정보도 공유해요.',
+ 'board','subsidiary','anonymous_allowed','open',true,false,'latest','discussion',12,520,118,
+ '00000000-0000-0000-0000-000000000017',NOW()-INTERVAL '85 days'),
+
+('10000000-0000-0000-0000-000000000011','hshi-board','HD삼호중공업',
+ 'HD삼호중공업 영암 조선소 구성원들의 소통 공간입니다.',
+ 'board','subsidiary','anonymous_allowed','open',true,false,'latest','discussion',13,410,97,
+ '00000000-0000-0000-0000-000000000023',NOW()-INTERVAL '85 days'),
+
+('10000000-0000-0000-0000-000000000012','hmms-board','HD현대마린솔루션',
+ 'HD현대마린솔루션 구성원들의 이야기를 나눕니다. 선박 AS·솔루션 분야 종사자 모여라!',
+ 'board','subsidiary','anonymous_allowed','open',true,false,'latest','discussion',14,320,76,
+ '00000000-0000-0000-0000-000000000029',NOW()-INTERVAL '85 days'),
+
+('10000000-0000-0000-0000-000000000013','hhce-board','HD건설기계',
+ 'HD현대건설기계 구성원들의 소통 채널입니다.',
+ 'board','subsidiary','anonymous_allowed','open',true,false,'latest','discussion',15,280,64,
+ '00000000-0000-0000-0000-000000000035',NOW()-INTERVAL '85 days'),
+
+-- ── 소모임/동호회 (space) ──
+('10000000-0000-0000-0000-000000000014','club-hiking','등산 소모임',
+ '주말 등산을 함께 즐기는 모임입니다. 초보자도 환영! 월 1~2회 정기 산행을 진행합니다.',
+ 'space','interest','anonymous_allowed','open',true,false,'latest','social',20,142,56,
+ '00000000-0000-0000-0000-000000000005',NOW()-INTERVAL '80 days'),
+
+('10000000-0000-0000-0000-000000000015','club-reading','독서 소모임',
+ '매월 책을 선정하고 독후감을 나누는 독서 모임입니다. 장르 불문, 독서를 좋아하면 누구나!',
+ 'space','interest','anonymous_allowed','open',true,false,'latest','social',21,98,43,
+ '00000000-0000-0000-0000-000000000014',NOW()-INTERVAL '80 days'),
+
+('10000000-0000-0000-0000-000000000016','club-fitness','헬스/운동 소모임',
+ '운동 인증, 식단 공유, 운동 루틴 추천까지! 건강한 직장인이 모이는 곳.',
+ 'space','interest','anonymous_allowed','open',true,false,'latest','social',22,187,89,
+ '00000000-0000-0000-0000-000000000003',NOW()-INTERVAL '78 days'),
+
+('10000000-0000-0000-0000-000000000017','club-wine','와인 소모임',
+ '와인 테이스팅, 좋은 와인 추천, 월간 와인 모임을 진행합니다. 위스키도 환영!',
+ 'space','interest','anonymous_allowed','request',true,false,'latest','social',23,64,31,
+ '00000000-0000-0000-0000-000000000033',NOW()-INTERVAL '75 days'),
+
+('10000000-0000-0000-0000-000000000018','club-golf','골프 소모임',
+ '주말 라운딩 팀 구성, 스크린 골프 모임, 연습장 정보를 공유합니다.',
+ 'space','interest','anonymous_allowed','open',true,false,'latest','social',24,156,72,
+ '00000000-0000-0000-0000-000000000010',NOW()-INTERVAL '75 days'),
+
+('10000000-0000-0000-0000-000000000019','club-photography','사진 소모임',
+ 'DSLR, 미러리스, 스마트폰 카메라로 찍은 사진을 공유하고 피드백 받는 공간입니다.',
+ 'space','interest','anonymous_allowed','open',true,false,'latest','social',25,87,38,
+ '00000000-0000-0000-0000-000000000009',NOW()-INTERVAL '73 days'),
+
+('10000000-0000-0000-0000-000000000020','club-gaming','게임 소모임',
+ 'PC, 콘솔, 모바일 게임 모두 환영! 같이 팀 짜서 게임할 사람 구해요.',
+ 'space','interest','anonymous_allowed','open',true,false,'latest','social',26,213,97,
+ '00000000-0000-0000-0000-000000000007',NOW()-INTERVAL '73 days'),
+
+('10000000-0000-0000-0000-000000000021','club-cooking','요리/맛집 소모임',
+ '집밥 레시피 공유, 맛집 탐방, 요리 클래스 정보까지! 먹는 걸 좋아하는 분들 모여요.',
+ 'space','interest','anonymous_allowed','open',true,false,'latest','social',27,124,61,
+ '00000000-0000-0000-0000-000000000004',NOW()-INTERVAL '71 days'),
+
+-- 생활/재미 게시판
+('10000000-0000-0000-0000-000000000022','blind-date','사내 소개팅',
+ '사내 소개팅 신청, 후기, 만남 주선까지! 모든 내용은 익명으로 운영됩니다.',
+ 'board','company','anonymous_allowed','open',true,false,'hot','social',30,2845,167,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '70 days'),
+
+('10000000-0000-0000-0000-000000000023','stock-market','주식/재테크',
+ '주식, ETF, 부동산, 코인 등 재테크 정보를 나누는 공간입니다. 투자는 본인 책임!',
+ 'board','company','anonymous_allowed','open',true,false,'hot','discussion',31,2845,234,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '70 days'),
+
+('10000000-0000-0000-0000-000000000024','restaurant','맛집 추천',
+ '울산, 서울, 창원, 영암 등 사업장 인근 맛집을 추천하고 후기를 공유합니다.',
+ 'board','company','anonymous_allowed','open',true,false,'hot','social',32,2845,289,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '69 days'),
+
+('10000000-0000-0000-0000-000000000025','house-info','부동산/이사 정보',
+ '전세, 월세, 아파트 매매, 이사 정보를 공유합니다. 집 구하는 분들 여기 모여요!',
+ 'board','company','anonymous_allowed','open',true,false,'latest','discussion',33,2845,145,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '69 days'),
+
+('10000000-0000-0000-0000-000000000026','car-talk','자동차',
+ '자동차 구매 후기, 정비 팁, 중고차 정보, 차박 명소까지! 자동차 좋아하는 분들 환영.',
+ 'board','company','anonymous_allowed','open',true,false,'hot','social',34,2845,178,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '68 days'),
+
+('10000000-0000-0000-0000-000000000027','travel','여행 정보',
+ '국내외 여행 후기, 숙소 추천, 여행 계획을 공유하는 게시판입니다.',
+ 'board','company','anonymous_allowed','open',true,false,'hot','social',35,2845,212,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '68 days'),
+
+('10000000-0000-0000-0000-000000000028','secondhand','중고거래',
+ '임직원 간 안전한 중고 물품 거래 공간입니다. 실명 거래, 직거래 원칙.',
+ 'board','company','real_only','open',true,false,'latest','social',36,2845,321,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '67 days'),
+
+('10000000-0000-0000-0000-000000000029','parenting','육아/가족',
+ '육아, 교육, 가족 행사, 어린이집 정보 등 가족과 관련된 모든 이야기를 나눕니다.',
+ 'board','company','anonymous_allowed','open',true,false,'latest','social',37,2845,123,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '67 days'),
+
+-- 업무/커리어 게시판
+('10000000-0000-0000-0000-000000000030','career','커리어/이직',
+ '커리어 고민, 이직 경험담, 직무 인터뷰 팁을 익명으로 공유합니다.',
+ 'board','company','anonymous_allowed','open',true,false,'hot','discussion',40,2845,198,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '65 days'),
+
+('10000000-0000-0000-0000-000000000031','wfh','재택근무 꿀팁',
+ '재택근무 환경 셋업, 생산성 꿀팁, 재택 장비 추천을 나눕니다.',
+ 'board','company','anonymous_allowed','open',true,false,'hot','knowledge',41,2845,156,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '65 days'),
+
+('10000000-0000-0000-0000-000000000032','tech-stack','기술 스택',
+ '개발 기술, 아키텍처, 새로운 도구에 대한 기술적인 토론을 합니다.',
+ 'board','company','anonymous_allowed','open',true,false,'hot','knowledge',42,2845,167,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '64 days'),
+
+('10000000-0000-0000-0000-000000000033','tool-review','업무 도구 리뷰',
+ 'Notion, Figma, Slack, Jira 등 업무 툴 사용 후기와 팁을 공유합니다.',
+ 'board','company','anonymous_allowed','open',true,false,'latest','knowledge',43,2845,134,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '64 days'),
+
+('10000000-0000-0000-0000-000000000034','onboarding','신입/이직자 온보딩',
+ '입사 초기에 알면 좋은 정보, 선배들의 조언, 온보딩 경험을 공유합니다.',
+ 'board','company','anonymous_allowed','open',true,false,'latest','knowledge',44,2845,89,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '63 days'),
+
+-- 익명 전용 게시판
+('10000000-0000-0000-0000-000000000035','confess','직장인 고민상담',
+ '직장 생활의 고민을 털어놓고 동료들의 따뜻한 조언을 받는 공간입니다. 완전 익명.',
+ 'board','company','anonymous_only','open',true,false,'hot','discussion',50,2845,276,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '60 days'),
+
+('10000000-0000-0000-0000-000000000036','salary','연봉/복지 공유',
+ '연봉, 인상률, 복지 포인트 등을 익명으로 투명하게 공유합니다. 완전 익명.',
+ 'board','company','anonymous_only','open',true,false,'hot','discussion',51,2845,312,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '60 days'),
+
+('10000000-0000-0000-0000-000000000037','boss-story','상사 이야기',
+ '상사 칭찬도, 하소연도 OK. 익명으로 솔직하게 털어놓는 공간.',
+ 'board','company','anonymous_only','open',true,false,'hot','discussion',52,2845,234,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '60 days'),
+
+('10000000-0000-0000-0000-000000000038','work-life','워라밸',
+ '일과 삶의 균형에 대해 이야기 나누는 공간입니다. 번아웃 예방, 취미 생활 공유.',
+ 'board','company','anonymous_only','open',true,false,'hot','discussion',53,2845,189,
+ '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '60 days')
+ON CONFLICT (slug) DO NOTHING;
+
+COMMIT;
+
+
+-- =============================================================
+-- PART 4: POSTS (100개)
+-- =============================================================
+BEGIN;
+
+INSERT INTO posts (id, channel_id, author_id, kind, is_anonymous, anon_alias, title, content, content_type, media_urls, link_url, link_preview, upvote_count, downvote_count, comment_count, view_count, flair, is_pinned, is_deleted, hot_score, created_at)
+VALUES
+('20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000039','text',false::boolean,NULL,
+ E'2026년 상반기 임직원 복지포인트 안내',
+ E'안녕하세요, 구성원 여러분. 2026년 상반기 복지포인트(1인당 60만원)가 4월 25일에 지급될 예정입니다. 복지몰 이용, 자기계발비, 건강검진 등에 활용하실 수 있습니다. 자세한 사항은 HR 포털을 확인해 주세요. #복지포인트 #HR공지',
+ 'text','{}',NULL,NULL,18,0,5,342,'공지',true::boolean,false,70.0,NOW()-INTERVAL '3 days'),
+('20000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000039','text',false::boolean,NULL,
+ E'HD현대 그룹 사내 커뮤니티 플랫폼 오픈 안내',
+ E'안녕하세요! 그룹 구성원 여러분의 소통과 협업을 위한 사내 커뮤니티 플랫폼이 정식 오픈되었습니다. 실명/익명 게시판, 그룹사별 채널, 소모임 공간 등 다양한 기능을 이용해보세요. 의견과 피드백은 아이디어 제안 게시판에 남겨주시면 반영하겠습니다. #커뮤니티오픈 #공지',
+ 'text','{}',NULL,NULL,87,0,18,1243,'공지',true::boolean,false,307.5,NOW()-INTERVAL '7 days'),
+('20000000-0000-0000-0000-000000000003','10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000039','text',false::boolean,NULL,
+ E'5월 조기 퇴근 시범 운영 안내 (금요일 4시 퇴근)',
+ E'구성원 여러분의 워라밸 향상을 위해 5월 한 달간 매주 금요일 4시 조기 퇴근을 시범 운영합니다. 부서별 업무 상황에 따라 조율하여 적용해 주시기 바랍니다. 설문조사에 참여해 주시면 정식 제도화 검토에 큰 도움이 됩니다. #워라밸 #복지',
+ 'text','{}',NULL,NULL,124,2,32,1876,'공지',true::boolean,false,467.0,NOW()-INTERVAL '1 days'),
+('20000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000006','text',false::boolean,NULL,
+ E'신규 온보딩 프로그램에 대한 여러분의 의견을 듣고 싶어요!',
+ E'최근 신입 구성원들의 적응 기간을 단축하고, 팀에 빠르게 기여할 수 있도록 온보딩 프로그램을 개선하려고 합니다. 혹시 더 좋은 아이디어나 경험이 있다면 공유 부탁드려요. 함께 좋은 문화를 만들어가요! #온보딩 #의견수렴 #문화',
+ 'text','{}',NULL,NULL,24,1,18,489,'일상',false::boolean,false,148.5,NOW()-INTERVAL '2 hours'),
+('20000000-0000-0000-0000-000000000005','10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000003','text',false::boolean,NULL,
+ E'재택근무 시 집중력을 높이는 자신만의 방법이 있나요?',
+ E'집중이 잘 안 될 때가 많아요. 저는 포모도로 기법(25분 집중 5분 휴식)을 쓰는데 여러분만의 루틴이나 꿀팁이 있다면 공유해 주세요! 최근 백색소음 앱도 써봤는데 꽤 효과적이더라고요. #재택근무 #생산성 #집중',
+ 'text','{}',NULL,NULL,37,2,27,489,'일상',false::boolean,false,224.5,NOW()-INTERVAL '4 hours'),
+('20000000-0000-0000-0000-000000000006','10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000007','text',false::boolean,NULL,
+ E'CI/CD 파이프라인 개선 경험 공유합니다',
+ E'빌드 시간이 너무 오래 걸려서 파이프라인을 개선했던 경험을 공유합니다. Docker 레이어 캐싱, 병렬 빌드 설정, GitHub Actions 최적화로 빌드 시간을 15분에서 3분으로 단축했어요. 비슷한 문제를 겪고 계신 분들께 도움이 되었으면 해요! #CICD #DevOps #개발',
+ 'text','{}',NULL,NULL,19,1,9,312,'기술',false::boolean,false,91.0,NOW()-INTERVAL '3 hours'),
+('20000000-0000-0000-0000-000000000007','10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000009','text',false::boolean,NULL,
+ E'요즘 읽고 있는 책 추천해주세요',
+ E'올해 목표가 12권 읽기인데 벌써 4월인데 3권밖에 못 읽었어요 ㅠㅠ 요즘 여러분은 어떤 책 읽고 계세요? 자기계발, 소설, 경제 뭐든 환영합니다! 저는 최근 "초예측"이라는 책이 재미있었어요. #독서 #자기계발 #책추천',
+ 'text','{}',NULL,NULL,31,0,14,267,'일상',false::boolean,false,147.5,NOW()-INTERVAL '1 days'),
+('20000000-0000-0000-0000-000000000008','10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000004','text',false::boolean,NULL,
+ E'사내 구내식당 메뉴 개선 건의드려요',
+ E'매주 비슷한 메뉴가 반복되는 것 같아서요. 가끔은 월간 특별 메뉴나 지역별 음식 테마 같은 게 있으면 좋겠어요. 특히 샐러드 종류가 더 다양해졌으면 합니다! 여러분은 어떻게 생각하세요? #구내식당 #복지 #아이디어',
+ 'text','{}',NULL,NULL,42,3,21,389,'일상',false::boolean,false,205.5,NOW()-INTERVAL '2 days'),
+('20000000-0000-0000-0000-000000000009','10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000001','text',false::boolean,NULL,
+ E'울산 본사 근처 점심 추천 좀 해주세요',
+ E'최근 팀 이동으로 울산 본사로 배치됐는데 점심 맛집을 모르겠어요. 특히 걸어서 갈 수 있는 거리에 괜찮은 한식당이 있으면 알려주세요! 고기집, 국밥집 다 환영합니다. #울산맛집 #점심 #현중',
+ 'text','{}',NULL,NULL,28,0,16,341,'일상',false::boolean,false,150.0,NOW()-INTERVAL '1 hours'),
+('20000000-0000-0000-0000-000000000010','10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000005','text',true::boolean,'익명 고라니',
+ E'이직 고민인데 조언 부탁드립니다',
+ E'입사 6년차인데 요즘 많이 지쳐있어요. 타사 오퍼를 받았는데 연봉은 1500만원 높은데 복지랑 분위기를 모르겠어요. 이런 상황에서 어떻게 결정하셨나요? 현 직장에 대한 불만은 딱히 없는데 더 성장할 수 있을지 의문이에요. #이직 #고민 #커리어',
+ 'text','{}',NULL,NULL,56,4,38,789,'고민',false::boolean,false,324.0,NOW()-INTERVAL '5 hours'),
+('20000000-0000-0000-0000-000000000011','10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000014','text',true::boolean,'익명 수달',
+ E'연봉 협상 어떻게 하셨나요?',
+ E'내년에 연봉 협상 시즌이 다가오는데 처음이라 막막합니다. 근거 자료는 어떻게 준비하셨나요? 시장 급여 기준은 어떻게 찾아보시나요? 업계 평균 대비 제 연봉이 낮은 것 같은데 어떻게 협상을 시작해야 할지... #연봉협상 #급여 #고민',
+ 'text','{}',NULL,NULL,48,1,29,612,'고민',false::boolean,false,263.5,NOW()-INTERVAL '1 days'),
+('20000000-0000-0000-0000-000000000012','10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000022','text',true::boolean,'익명 토끼',
+ E'상사가 너무 마이크로매니지먼트를 해서 힘드네요',
+ E'사소한 것 하나하나 다 체크하고 보고 요구하는데 이게 정상인가요? 다른 팀도 이런가요? 자율성이 없으니 점점 의욕이 떨어져요. 그냥 참는 게 나을지, 아니면 솔직하게 말씀드려야 할지 고민입니다. #마이크로매니지먼트 #상사 #직장생활',
+ 'text','{}',NULL,NULL,72,5,44,934,'고민',false::boolean,false,392.5,NOW()-INTERVAL '8 hours'),
+('20000000-0000-0000-0000-000000000013','10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000030','text',true::boolean,'익명 여우',
+ E'팀 분위기가 너무 경직되어 있어서 말 한마디 하기가 무서워요',
+ E'우리 팀은 회의 때 아무도 의견을 안 내요. 팀장님이 무서운 분이라 눈치를 많이 보는 분위기인데, 다들 이런 환경에서 어떻게 버티시나요? 아니면 분위기를 바꾸는 방법이 있을까요? #팀분위기 #소통 #직장',
+ 'text','{}',NULL,NULL,61,3,35,712,'고민',false::boolean,false,323.0,NOW()-INTERVAL '6 hours'),
+('20000000-0000-0000-0000-000000000014','10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000008','text',true::boolean,'익명 라쿤',
+ E'육아휴직 후 복직하면 불이익이 있나요?',
+ E'둘째가 생겼는데 육아휴직을 쓰고 싶어요. 법적으로는 당연히 쓸 수 있지만 현실적으로 팀에서 어떻게 반응하는지, 복직 후 업무나 평가에 영향이 있는지 솔직한 경험을 듣고 싶어요. #육아휴직 #복직 #워킹맘',
+ 'text','{}',NULL,NULL,84,2,52,1089,'고민',false::boolean,false,467.0,NOW()-INTERVAL '4 hours'),
+('20000000-0000-0000-0000-000000000015','10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000013','text',false::boolean,NULL,
+ E'그룹사 간 전배 신청은 어떻게 하나요?',
+ E'현재 KSOE 소속인데 HHI 쪽 프로젝트에 관심이 생겨서요. 그룹사 간 전배 제도가 있는지, 있다면 절차가 어떻게 되는지 알고 싶습니다. 경험하신 분 계시면 공유 부탁드려요! #전배 #인사 #그룹사',
+ 'text','{}',NULL,NULL,15,0,8,234,'질문',false::boolean,false,77.5,NOW()-INTERVAL '2 days'),
+('20000000-0000-0000-0000-000000000016','10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000019','text',false::boolean,NULL,
+ E'복지포인트로 어떤 걸 주로 쓰시나요?',
+ E'저는 보통 자기계발비로 쓰는데 다들 어떻게 활용하시는지 궁금해요. 복지몰 활용도 좋은 것 같고, 헬스장 등록도 가능하다고 들었는데 추천 활용법 있으면 알려주세요! #복지포인트 #복지 #꿀팁',
+ 'text','{}',NULL,NULL,29,0,22,412,'질문',false::boolean,false,182.5,NOW()-INTERVAL '1 days'),
+('20000000-0000-0000-0000-000000000017','10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000031','text',false::boolean,NULL,
+ E'맥북 vs 윈도우 업무 노트북 어떤 게 더 좋나요?',
+ E'새로 지급받을 노트북 선택할 수 있는데 맥북 M3 Pro와 ThinkPad 사이에서 고민 중이에요. 개발자 분들은 어떤 걸 선호하시나요? 회사 VPN, 사내 시스템 호환성도 확인 필요할 것 같아서요. #노트북 #개발환경 #IT',
+ 'text','{}',NULL,NULL,38,1,28,534,'질문',false::boolean,false,233.5,NOW()-INTERVAL '2 hours'),
+('20000000-0000-0000-0000-000000000018','10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000006','text',false::boolean,NULL,
+ E'사내 동호회 지원금은 어떻게 신청하나요?',
+ E'등산 소모임을 만들었는데 사내 동호회 지원금을 신청할 수 있다고 들었어요. 최소 인원이 몇 명인지, 어디에 신청하는지 아시는 분 계신가요? HR 포털에서 찾아봤는데 잘 모르겠어요. #동호회 #복지 #소모임',
+ 'text','{}',NULL,NULL,17,0,11,189,'질문',false::boolean,false,97.5,NOW()-INTERVAL '3 days'),
+('20000000-0000-0000-0000-000000000019','10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000007','text',false::boolean,NULL,
+ E'2025년 조선업 트렌드 정리 - LNG 추진선과 암모니아 연료',
+ E'최근 IMO 환경 규제 강화로 친환경 선박 시장이 급성장하고 있습니다. LNG 추진선 발주가 전년 대비 40% 증가했고, 암모니아 연료 선박도 본격 상용화 단계에 들어섰어요. HD현대 그룹이 이 분야에서 글로벌 경쟁력을 갖추고 있다는 게 자랑스럽습니다. #조선업 #LNG #친환경선박 #트렌드',
+ 'text','{}',NULL,NULL,45,1,19,678,'정보',false::boolean,false,206.0,NOW()-INTERVAL '4 days'),
+('20000000-0000-0000-0000-000000000020','10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000016','text',false::boolean,NULL,
+ E'ChatGPT/Claude로 업무 효율화하는 방법 공유',
+ E'요즘 AI 툴 적극 활용하고 있는데 몇 가지 팁 공유드릴게요. 1) 보고서 초안 작성: 키워드만 입력해도 초안 나와요 2) 회의록 요약: 텍스트 붙여넣으면 핵심 정리 3) 코드 리뷰: 간단한 버그 체크에 효과적. 단, 기밀 정보는 절대 입력 금지! #AI #업무효율 #ChatGPT #Claude',
+ 'text','{}',NULL,NULL,63,4,31,892,'정보',false::boolean,false,306.5,NOW()-INTERVAL '2 days'),
+('20000000-0000-0000-0000-000000000021','10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000032','text',false::boolean,NULL,
+ E'사내 Wi-Fi 속도 개선 방법 (개인 설정 팁)',
+ E'사무실에서 와이파이가 느리다고 느끼신 분들 계신가요? 5GHz 대역으로 연결하면 훨씬 빠릅니다. 또한 DNS를 8.8.8.8 (Google)로 변경하면 체감 속도가 올라가요. 노트북 Wi-Fi 드라이버 업데이트도 잊지 마세요! #IT팁 #와이파이 #업무환경',
+ 'text','{}',NULL,NULL,28,2,13,412,'정보',false::boolean,false,132.0,NOW()-INTERVAL '6 days'),
+('20000000-0000-0000-0000-000000000022','10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000009','text',false::boolean,NULL,
+ E'마케팅팀 도예은 과장님 칭찬합니다!',
+ E'이번 그룹사 커뮤니티 플랫폼 오픈 홍보를 맡아주신 도예은 과장님! 정말 짧은 시간 안에 완성도 높은 홍보 자료를 만들어주셨어요. 덕분에 오픈 첫날부터 많은 분들이 가입해 주셨습니다. 항상 꼼꼼하고 책임감 있게 일해 주셔서 감사드려요! #칭찬 #마케팅 #감사',
+ 'text','{}',NULL,NULL,32,0,8,289,'칭찬',false::boolean,false,120.0,NOW()-INTERVAL '3 days'),
+('20000000-0000-0000-0000-000000000023','10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000005','text',false::boolean,NULL,
+ E'IT전략팀 이서연 대리님께 감사 인사 드립니다',
+ E'지난 주 서버 장애 당시 새벽 2시에도 달려와서 빠르게 복구해 주셨어요. 덕분에 다음 날 업무에 지장이 없었습니다. 개인 시간을 희생해가며 팀을 위해 애쓰시는 모습이 정말 감사하고 존경스럽습니다. 앞으로도 함께해요! #칭찬 #IT팀 #감사',
+ 'text','{}',NULL,NULL,45,0,12,367,'칭찬',false::boolean,false,172.5,NOW()-INTERVAL '1 days'),
+('20000000-0000-0000-0000-000000000024','10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000014','text',false::boolean,NULL,
+ E'HR팀 최유진 대리님 정말 고마워요',
+ E'최근 육아휴직 관련 문의드렸을 때 정말 친절하고 꼼꼼하게 안내해 주셨어요. 복잡한 서류 절차도 하나하나 알려주셔서 너무 도움이 됐습니다. HR 업무가 힘드실 텐데도 항상 밝고 친절하게 응대해 주셔서 감사합니다! #칭찬 #HR #감사',
+ 'text','{}',NULL,NULL,28,0,6,198,'칭찬',false::boolean,false,100.0,NOW()-INTERVAL '5 days'),
+('20000000-0000-0000-0000-000000000025','10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000002','text',false::boolean,NULL,
+ E'커뮤니티 플랫폼에 "감사 배지" 기능 추가 제안',
+ E'블라인드나 LinkedIn처럼 동료에게 감사 배지를 보낼 수 있는 기능이 있으면 어떨까요? 월별 배지 개수 제한을 두고, 받은 배지는 프로필에 표시되는 방식으로요. 긍정적인 피드백 문화 형성에 도움이 될 것 같아요. #아이디어 #감사배지 #커뮤니티',
+ 'text','{}',NULL,NULL,67,4,28,712,'아이디어',false::boolean,false,301.5,NOW()-INTERVAL '2 days'),
+('20000000-0000-0000-0000-000000000026','10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000033','text',false::boolean,NULL,
+ E'점심 메뉴 사전 투표 시스템 제안',
+ E'구내식당 점심 메뉴를 3일 전에 미리 투표로 결정하는 시스템이 있으면 어떨까요? 앱이나 이 플랫폼에서 투표하고, 득표율 상위 메뉴가 실제로 제공되는 방식이요. 음식 낭비도 줄이고 만족도도 높아질 것 같습니다. #아이디어 #구내식당 #투표',
+ 'text','{}',NULL,NULL,89,6,41,934,'아이디어',false::boolean,false,418.5,NOW()-INTERVAL '6 hours'),
+('20000000-0000-0000-0000-000000000027','10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000040','text',false::boolean,NULL,
+ E'사내 멘토링 매칭 프로그램 제안',
+ E'경력 3년 이상 선배와 신입/주니어를 연결하는 멘토링 프로그램을 플랫폼 내에서 운영하면 좋겠어요. 멘토는 월 1회 미팅, 멘티는 질문/고민을 나눌 수 있고, 활동 인증 시 복지포인트 지급! 많은 분들이 관심 가지실 것 같아요. #멘토링 #아이디어 #성장',
+ 'text','{}',NULL,NULL,54,2,23,567,'아이디어',false::boolean,false,247.0,NOW()-INTERVAL '4 days'),
+('20000000-0000-0000-0000-000000000028','10000000-0000-0000-0000-000000000008','00000000-0000-0000-0000-000000000001','text',false::boolean,NULL,
+ E'2026년 1분기 대규모 수주 달성 축하합니다!',
+ E'이번 분기 LNG 운반선 12척, 컨테이너선 8척 수주에 성공했습니다! 조선 업황이 좋아지면서 우리 회사도 계속 성장하고 있네요. 수주 팀 여러분 정말 수고 많으셨고, 모든 중공업인 여러분도 고생 많으셨습니다. 앞으로도 화이팅! #수주 #HHI #조선업',
+ 'text','{}',NULL,NULL,78,1,24,892,'업무',false::boolean,false,313.5,NOW()-INTERVAL '3 days'),
+('20000000-0000-0000-0000-000000000029','10000000-0000-0000-0000-000000000008','00000000-0000-0000-0000-000000000003','text',false::boolean,NULL,
+ E'울산 조선소 식당 리뉴얼 후기',
+ E'이번에 2도크 구내식당이 새로 리뉴얼 됐는데 분위기가 훨씬 좋아졌어요! 메뉴도 다양해지고 좌석도 늘어났습니다. 특히 점심 시간 줄이 훨씬 줄어든 것 같더라고요. 사측에서 이런 노력 해주셔서 감사합니다. #구내식당 #울산 #복지',
+ 'text','{}',NULL,NULL,34,0,11,423,'일상',false::boolean,false,140.0,NOW()-INTERVAL '1 days'),
+('20000000-0000-0000-0000-000000000030','10000000-0000-0000-0000-000000000008','00000000-0000-0000-0000-000000000010','text',false::boolean,NULL,
+ E'HD현대중공업 울산 근처 맛집 지도 공유',
+ E'울산에 새로 오신 분들을 위해 회사 근처 맛집을 정리해봤어요!
+
+🍖 고기: 삼겹살하우스(도보 5분), 소갈비전문점(차량 10분)
+🍜 면류: 동네국수집(도보 3분), 냉면전문점(차량 8분)
+🍱 한식: 백반집(도보 7분), 찌개전문점(도보 10분)
+
+도움이 되셨으면 좋겠어요! #울산맛집 #HHI #점심',
+ 'text','{}',NULL,NULL,56,2,19,678,'생활',false::boolean,false,232.0,NOW()-INTERVAL '12 hours'),
+('20000000-0000-0000-0000-000000000031','10000000-0000-0000-0000-000000000008','00000000-0000-0000-0000-000000000007','text',false::boolean,NULL,
+ E'현중 DevOps팀 신규 입사자 환영합니다',
+ E'이번 달 DevOps팀에 3명의 신규 팀원이 합류했습니다. 잘 부탁드리고, 모르는 게 있으면 뭐든지 물어보세요! 온보딩 기간에 부담 없이 적응하실 수 있도록 팀 전체가 함께 도와드릴게요. #환영 #온보딩 #DevOps',
+ 'text','{}',NULL,NULL,22,0,7,312,'일상',false::boolean,false,90.0,NOW()-INTERVAL '2 days'),
+('20000000-0000-0000-0000-000000000032','10000000-0000-0000-0000-000000000009','00000000-0000-0000-0000-000000000011','text',false::boolean,NULL,
+ E'KSOE 해양플랜트 프로젝트 성공 기원!',
+ E'카타르 LNG 해양플랜트 프로젝트가 본격 착공에 들어갔습니다. 수년간의 수주 노력 끝에 얻은 결과인 만큼 모두 함께 힘내봅시다. 프로젝트 기간 동안 안전하게 완수할 수 있도록 서로 도와가며 진행해요. #KSOE #해양플랜트 #프로젝트',
+ 'text','{}',NULL,NULL,43,1,15,567,'업무',false::boolean,false,181.0,NOW()-INTERVAL '5 days'),
+('20000000-0000-0000-0000-000000000033','10000000-0000-0000-0000-000000000009','00000000-0000-0000-0000-000000000014','text',false::boolean,NULL,
+ E'한국조선해양 근처 카페 추천 (서울 사무소)',
+ E'서울 사무소 근처 작업하기 좋은 카페들이에요!
+
+☕ 스타벅스 (리저브): 조용하고 콘센트 많아요
+☕ 블루보틀: 원두 맛이 일품
+☕ 투썸플레이스: 미팅하기 좋은 공간
+
+비대면 미팅이 많은 요즘, 좋은 카페 공유해드렸어요. #서울사무소 #카페 #KSOE',
+ 'text','{}',NULL,NULL,29,0,9,312,'생활',false::boolean,false,117.5,NOW()-INTERVAL '4 days'),
+('20000000-0000-0000-0000-000000000034','10000000-0000-0000-0000-000000000009','00000000-0000-0000-0000-000000000016','text',false::boolean,NULL,
+ E'기술연구팀 신기술 세미나 개최 안내',
+ E'다음 달 15일, 스마트 선박 기술 트렌드 세미나를 개최합니다. 자율운항 선박, IoT 기반 원격 모니터링, AI 선박 예측 유지보수 등을 주제로 진행됩니다. 사내 구성원이라면 누구나 참석 가능하니 많은 관심 부탁드립니다. #세미나 #스마트선박 #기술',
+ 'text','{}',NULL,NULL,38,0,14,489,'업무',false::boolean,false,165.0,NOW()-INTERVAL '2 days'),
+('20000000-0000-0000-0000-000000000035','10000000-0000-0000-0000-000000000010','00000000-0000-0000-0000-000000000017','text',false::boolean,NULL,
+ E'변압기 사업부 글로벌 시장 진출 소식 공유',
+ E'HD현대일렉트릭의 변압기 제품이 미국, 중동 시장에서 수주가 크게 늘고 있다고 합니다. 전력 인프라 투자 확대와 맞물려 우리 사업부가 큰 기회를 잡고 있네요. 앞으로 더 많은 성장이 기대됩니다! #일렉트릭 #변압기 #글로벌',
+ 'text','{}',NULL,NULL,35,1,12,412,'업무',false::boolean,false,146.0,NOW()-INTERVAL '6 days'),
+('20000000-0000-0000-0000-000000000036','10000000-0000-0000-0000-000000000010','00000000-0000-0000-0000-000000000020','text',false::boolean,NULL,
+ E'창원 공장 구성원들, 식당 메뉴 어떠세요?',
+ E'창원 공장 구내식당 메뉴가 최근 바뀐 것 같던데요. 예전보다 나아진 것 같기도 하고... 여러분 의견이 궁금해요. 특히 점심 시간대 줄 서는 문제가 개선됐으면 좋겠습니다. 의견 있으신 분들 댓글 달아주세요! #창원 #구내식당 #복지',
+ 'text','{}',NULL,NULL,21,2,18,289,'일상',false::boolean,false,139.5,NOW()-INTERVAL '3 days'),
+('20000000-0000-0000-0000-000000000037','10000000-0000-0000-0000-000000000010','00000000-0000-0000-0000-000000000022','text',false::boolean,NULL,
+ E'전력변환 기술 관련 외부 컨퍼런스 참가 후기',
+ E'지난주 HVDC 기술 컨퍼런스에 참가했습니다. 해외 기업들의 최신 기술 동향을 파악할 수 있어서 좋았고, 특히 우리 회사 기술력이 상당히 경쟁력 있다는 걸 확인할 수 있었어요. 관심 있으신 분들께 발표 자료 공유해드릴 수 있습니다. #컨퍼런스 #HVDC #기술',
+ 'text','{}',NULL,NULL,28,0,8,367,'정보',false::boolean,false,110.0,NOW()-INTERVAL '5 days'),
+('20000000-0000-0000-0000-000000000038','10000000-0000-0000-0000-000000000011','00000000-0000-0000-0000-000000000026','text',false::boolean,NULL,
+ E'영암 조선소 봄 단체 나들이 후기!',
+ E'지난 주말 팀 단합대회로 해남 땅끝마을에 다녀왔습니다. 봄꽃도 예쁘고, 해산물도 너무 맛있었어요. 힘든 시즌 마치고 다 같이 힐링하는 시간이 정말 좋았습니다. 다음 나들이도 기대됩니다! #단합대회 #영암 #힐링',
+ 'text','{}',NULL,NULL,28,0,9,289,'일상',false::boolean,false,115.0,NOW()-INTERVAL '4 days'),
+('20000000-0000-0000-0000-000000000039','10000000-0000-0000-0000-000000000011','00000000-0000-0000-0000-000000000025','text',false::boolean,NULL,
+ E'삼호 도장팀 신공법 도입 성공 사례',
+ E'이번에 도장 공정에 스프레이 로봇을 도입했는데 생산성이 30%이상 향상됐어요. 불량률도 크게 줄고 작업 환경도 개선됐습니다. 현장에서 직접 느끼는 변화가 정말 뿌듯하네요. 기술 혁신이 계속 이어지면 좋겠습니다. #삼호 #도장 #자동화',
+ 'text','{}',NULL,NULL,34,1,11,412,'업무',false::boolean,false,138.5,NOW()-INTERVAL '7 days'),
+('20000000-0000-0000-0000-000000000040','10000000-0000-0000-0000-000000000012','00000000-0000-0000-0000-000000000029','text',false::boolean,NULL,
+ E'선박 원격 모니터링 서비스 100척 돌파!',
+ E'마린솔루션의 선박 원격 모니터링 서비스가 드디어 누적 100척을 돌파했습니다! 고객사의 만족도도 매우 높아서 추가 계약도 이어지고 있어요. 서비스팀 여러분 정말 고생 많으셨습니다. 앞으로 200척, 300척을 향해 달려봅시다! #마린솔루션 #모니터링 #성과',
+ 'text','{}',NULL,NULL,41,0,13,489,'업무',false::boolean,false,167.5,NOW()-INTERVAL '3 days'),
+('20000000-0000-0000-0000-000000000041','10000000-0000-0000-0000-000000000012','00000000-0000-0000-0000-000000000034','text',false::boolean,NULL,
+ E'부산 사무소에서 서울 출장 시 숙소 추천',
+ E'부산 사무소에서 서울 출장이 잦은 편인데 합리적인 비즈니스 호텔 추천 부탁드립니다. 강남 근처나 여의도 근처로요. 회사 출장 규정 한도 내에서 쾌적한 곳이면 좋겠어요! #출장 #서울 #숙소추천',
+ 'text','{}',NULL,NULL,18,0,14,234,'생활',false::boolean,false,115.0,NOW()-INTERVAL '2 days'),
+('20000000-0000-0000-0000-000000000042','10000000-0000-0000-0000-000000000013','00000000-0000-0000-0000-000000000036','text',false::boolean,NULL,
+ E'건설기계 부문 인도·동남아 시장 공략 성과',
+ E'올해 1분기 인도, 인도네시아, 베트남 시장에서 건설기계 판매량이 전년 대비 25% 증가했습니다. 현지화 전략이 잘 먹히고 있는 것 같아요. 해외 영업팀 여러분 수고 많으셨습니다! #건설기계 #해외영업 #성과',
+ 'text','{}',NULL,NULL,29,1,8,312,'업무',false::boolean,false,111.0,NOW()-INTERVAL '8 days'),
+('20000000-0000-0000-0000-000000000043','10000000-0000-0000-0000-000000000013','00000000-0000-0000-0000-000000000038','text',false::boolean,NULL,
+ E'울산 조립공장 안전 캠페인 결과 공유',
+ E'지난 1분기 안전 무재해 목표를 달성했습니다! 지속적인 안전 교육과 현장 개선 활동 덕분이에요. 안전은 아무리 강조해도 지나치지 않습니다. 앞으로도 안전제일을 최우선으로 해봅시다. #안전 #무재해 #건설기계',
+ 'text','{}',NULL,NULL,23,0,7,267,'업무',false::boolean,false,92.5,NOW()-INTERVAL '3 days'),
+('20000000-0000-0000-0000-000000000044','10000000-0000-0000-0000-000000000014','00000000-0000-0000-0000-000000000005','text',false::boolean,NULL,
+ E'5월 지리산 노고단 산행 모집 (5/18 일요일)',
+ E'지리산 노고단 정기 산행을 모집합니다!
+
+📅 일시: 5월 18일(일) 당일치기
+🚌 출발: 새벽 5시 서울 강남 집결
+⛰️ 코스: 성삼재 → 노고단 → 왕복 약 8km
+💰 경비: 버스비 3만원 (식비 별도)
+👥 모집: 15명 (선착순)
+
+참여 원하시면 댓글 또는 DM 주세요! #등산 #지리산 #소모임',
+ 'text','{}',NULL,NULL,18,0,12,234,'모임',false::boolean,false,105.0,NOW()-INTERVAL '4 days'),
+('20000000-0000-0000-0000-000000000045','10000000-0000-0000-0000-000000000014','00000000-0000-0000-0000-000000000028','text',false::boolean,NULL,
+ E'북한산 산행 후기 (주말 등산 인증)',
+ E'어제 북한산 백운대 다녀왔어요! 봄 날씨에 정말 좋았고, 철쭉이 막 피기 시작해서 경치가 예뻤습니다. 3시간 반 코스로 무릎이 조금 힘들었지만 내려오면서 먹은 막걸리가 최고였어요. 다음 달엔 누가 함께 가실 분? #북한산 #등산 #주말',
+ 'text','{}',NULL,NULL,24,0,8,289,'일상',false::boolean,false,100.0,NOW()-INTERVAL '36 hours'),
+('20000000-0000-0000-0000-000000000046','10000000-0000-0000-0000-000000000015','00000000-0000-0000-0000-000000000014','text',false::boolean,NULL,
+ E'5월 선정 도서: "당신이 옳다" (정혜신)',
+ E'이번 달 독서 모임 선정 도서는 정혜신 박사의 "당신이 옳다"입니다. 공감과 위로에 관한 이야기로, 직장 생활에서도 많은 인사이트를 얻을 수 있을 것 같아요.
+
+📚 독후감 마감: 5월 20일
+🗣️ 독서 토론: 5월 24일 저녁 7시 줌
+
+신청자 댓글 남겨주세요! #독서모임 #책추천 #소모임',
+ 'text','{}',NULL,NULL,14,0,7,178,'독서',false::boolean,false,70.0,NOW()-INTERVAL '5 days'),
+('20000000-0000-0000-0000-000000000047','10000000-0000-0000-0000-000000000015','00000000-0000-0000-0000-000000000004','text',false::boolean,NULL,
+ E'"잠깐, 왜 화가 났어?" 읽고 팀 소통에 적용해봤어요',
+ E'최근 읽은 감정 조절 관련 책인데 팀 회의에서 실제로 활용해봤어요. 상대의 말을 끊지 않고 끝까지 듣고, 감정 레이블링을 해주는 방법이 정말 효과적이더라고요. 팀 분위기가 조금씩 좋아지는 걸 느꼈어요. #독서 #소통 #팀관리',
+ 'text','{}',NULL,NULL,19,0,6,212,'독서',false::boolean,false,77.5,NOW()-INTERVAL '6 days'),
+('20000000-0000-0000-0000-000000000048','10000000-0000-0000-0000-000000000016','00000000-0000-0000-0000-000000000003','text',false::boolean,NULL,
+ E'오늘 헬스 인증 + 5월 목표 공유',
+ E'오늘 운동: 등 운동(데드리프트 100kg 3세트, 렛풀다운, 로우) + 유산소 20분
+
+5월 목표: 데드리프트 120kg 도전!
+
+다들 5월 목표 공유해봐요. 서로 응원해요! 💪 #헬스 #운동인증 #데드리프트',
+ 'text','{}',NULL,NULL,21,0,14,312,'운동',false::boolean,false,122.5,NOW()-INTERVAL '18 hours'),
+('20000000-0000-0000-0000-000000000049','10000000-0000-0000-0000-000000000016','00000000-0000-0000-0000-000000000001','text',false::boolean,NULL,
+ E'사무실 근처 헬스장 할인 정보 공유 (울산)',
+ E'울산 현대중공업 근처 헬스장에서 사내 임직원 단체 할인을 받을 수 있대요!
+
+💪 A헬스장: 월 4만원 (일반 6만원)
+💪 B스포츠센터: 월 3.5만원 (수영 포함)
+
+총무팀에 확인해보시면 단체 등록 가능하다고 합니다. #헬스 #할인 #울산',
+ 'text','{}',NULL,NULL,35,1,12,489,'정보',false::boolean,false,146.0,NOW()-INTERVAL '3 days'),
+('20000000-0000-0000-0000-000000000050','10000000-0000-0000-0000-000000000018','00000000-0000-0000-0000-000000000010','text',false::boolean,NULL,
+ E'이번 주 토요일 스크린골프 모집 (서울 강남)',
+ E'이번 주 토요일(4/26) 스크린골프 같이 치실 분!
+
+📍 장소: 강남 OOO 스크린골프장
+⏰ 시간: 오후 2시
+👥 모집: 4명 (2명 확정)
+💰 비용: 인당 약 2.5만원
+
+핸디 불문 환영합니다! #골프 #스크린골프 #소모임',
+ 'text','{}',NULL,NULL,15,0,9,189,'모임',false::boolean,false,82.5,NOW()-INTERVAL '48 hours'),
+('20000000-0000-0000-0000-000000000051','10000000-0000-0000-0000-000000000018','00000000-0000-0000-0000-000000000005','text',false::boolean,NULL,
+ E'골프 입문 6개월 후기 + 100타 달성!',
+ E'작년 10월 처음 골프를 시작했는데 드디어 지난 주 100타를 쳤어요! 처음에는 공도 제대로 못 치던 제가 여기까지 오다니 감격스럽네요. 레슨 받으신 분들 추천 코치 있으면 알려주세요. #골프 #100타 #입문',
+ 'text','{}',NULL,NULL,28,1,16,334,'일상',false::boolean,false,148.5,NOW()-INTERVAL '7 days'),
+('20000000-0000-0000-0000-000000000052','10000000-0000-0000-0000-000000000020','00000000-0000-0000-0000-000000000007','text',false::boolean,NULL,
+ E'리그오브레전드 내전 팀원 모집 (같이 랭크 올려봐요)',
+ E'롤 즐기시는 분들 팀 내전 하실 분 구해요!
+
+🎮 현재 인원: 3명
+🏆 티어: 골드~플래티넘 적당히 섞여있어요
+⏰ 주로 평일 저녁 9시 이후
+
+재미있게 같이 게임하실 분 DM 주세요! 승부욕보다는 즐기는 분위기로! #롤 #내전 #게임',
+ 'text','{}',NULL,NULL,19,0,11,234,'모임',false::boolean,false,102.5,NOW()-INTERVAL '24 hours'),
+('20000000-0000-0000-0000-000000000053','10000000-0000-0000-0000-000000000020','00000000-0000-0000-0000-000000000013','text',false::boolean,NULL,
+ E'요즘 핫한 게임 "발로란트" 입문 후기',
+ E'FPS 입문으로 발로란트 시작한 지 3주째인데 생각보다 재밌어요. 처음엔 에임이 너무 안 잡혀서 힘들었는데 연습 모드가 잘 돼있어서 빠르게 늘고 있어요. 같이 초보끼리 즐기실 분 계신가요? #발로란트 #FPS #게임',
+ 'text','{}',NULL,NULL,24,2,15,312,'일상',false::boolean,false,132.0,NOW()-INTERVAL '1 days'),
+('20000000-0000-0000-0000-000000000054','10000000-0000-0000-0000-000000000021','00000000-0000-0000-0000-000000000004','text',false::boolean,NULL,
+ E'집에서 만든 파스타 레시피 공유해요!',
+ E'주말에 만들어 먹은 크림 파스타 레시피 공유드려요!
+
+재료: 파스타면, 생크림, 버섯, 베이컨, 파마산치즈, 마늘
+방법: 1) 베이컨/버섯 볶기 2) 생크림 넣고 졸이기 3) 삶은 면 투입 4) 치즈 뿌리기
+
+정말 쉽고 맛있어요! #요리 #파스타 #레시피',
+ 'text','{}',NULL,NULL,31,0,12,367,'요리',false::boolean,false,137.5,NOW()-INTERVAL '2 days'),
+('20000000-0000-0000-0000-000000000055','10000000-0000-0000-0000-000000000021','00000000-0000-0000-0000-000000000009','text',false::boolean,NULL,
+ E'서울 성수동 핫한 신상 맛집 탐방 후기',
+ E'주말에 성수동 맛집 투어 다녀왔어요! 요즘 핫한 카페 3곳, 브런치 맛집 2곳을 다녀왔는데 정말 만족스러웠어요. 인스타 성지라 사람은 많지만 맛은 보장! 가실 분들 위해 상세 후기 작성해두겠습니다. #맛집 #성수동 #주말',
+ 'text','{}',NULL,NULL,27,0,9,312,'맛집',false::boolean,false,112.5,NOW()-INTERVAL '5 days'),
+('20000000-0000-0000-0000-000000000056','10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000015','text',true::boolean,'익명 나비',
+ E'소개팅 주선 신청합니다! (30대 초반 여성, KSOE)',
+ E'친구 대신 소개팅 주선 신청해요!
+
+👩 상대방 정보: 30대 초반, KSOE 근무, 취미 독서/카페, 진지한 만남 원함
+
+조건: 30~35세 남성, 안정적 직장, 밝고 따뜻한 성격이면 좋겠어요
+
+관심 있으신 분 익명 DM 주세요! #소개팅 #주선 #진지한만남',
+ 'text','{}',NULL,NULL,34,2,21,567,'소개팅',false::boolean,false,187.0,NOW()-INTERVAL '6 hours'),
+('20000000-0000-0000-0000-000000000057','10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000029','text',true::boolean,'익명 펭귄',
+ E'사내 소개팅 성공 후기 공유합니다 (결혼 예정)',
+ E'작년에 이 게시판 통해서 만난 분과 결혼하게 됐어요!! 커뮤니티에 감사 인사 드리고 싶어서 글 남깁니다. 처음엔 어색했는데 같은 회사 다니다 보니 공통 화제도 많고 이해도 잘 돼서 잘 맞았어요. 용기 내서 연락하기 정말 잘했어요! #소개팅성공 #결혼 #감사',
+ 'text','{}',NULL,NULL,127,3,58,1678,'후기',false::boolean,false,603.0,NOW()-INTERVAL '3 hours'),
+('20000000-0000-0000-0000-000000000058','10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000033','text',true::boolean,'익명 별',
+ E'소개팅 매너 좀 지켜주세요... (하소연)',
+ E'최근 이 게시판 통해 소개팅을 했는데 상대방이 연락도 없이 당일 노쇼를 했어요. 익명이라 어쩔 수 없지만... 상대를 배려하는 최소한의 매너는 지켜주셨으면 해요. 소개팅 잡으면 반드시 연락은 해주세요. #소개팅매너 #노쇼 #하소연',
+ 'text','{}',NULL,NULL,89,4,43,934,'고민',false::boolean,false,431.5,NOW()-INTERVAL '8 hours'),
+('20000000-0000-0000-0000-000000000059','10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000032','text',true::boolean,'익명 달빛',
+ E'소개팅 주선 받고 싶어요 (30대 남성, HMMS)',
+ E'소개팅 주선 부탁드립니다!
+
+👨 저: 30대 초반, HMMS 근무, 취미 골프/여행, 따뜻하고 성실한 편
+
+바라는 상대: 비슷한 또래, 밝고 긍정적인 분, 직종 무관
+
+진지하게 만날 준비 되어 있습니다. 주선해 주실 분 댓글 주세요! #소개팅 #주선요청',
+ 'text','{}',NULL,NULL,28,1,17,389,'소개팅',false::boolean,false,153.5,NOW()-INTERVAL '1 days'),
+('20000000-0000-0000-0000-000000000060','10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000012','text',false::boolean,NULL,
+ E'HD현대 주가 전망 어떻게 보세요? (2026년 하반기)',
+ E'최근 조선업 호황과 함께 HD현대 주가가 많이 올랐는데요. 하반기에도 계속 상승할 수 있을까요? LNG선 수주 증가, 친환경 선박 전환 수요를 감안하면 긍정적인데, 환율이나 원자재 리스크도 있어서... 여러분 의견이 궁금해요! #HD현대 #주식 #주가전망',
+ 'text','{}',NULL,NULL,67,4,34,789,'주식',false::boolean,false,331.5,NOW()-INTERVAL '3 hours'),
+('20000000-0000-0000-0000-000000000061','10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000002','text',false::boolean,NULL,
+ E'ETF 투자 입문자를 위한 완벽 가이드',
+ E'ETF 투자 시작하려는 분들을 위해 기초부터 정리해봤어요!
+
+📊 국내 추천: KODEX 200, TIGER 미국S&P500
+📊 해외 추천: VOO (S&P500), QQQ (나스닥)
+
+핵심은 분산투자 + 장기보유! 단기 매매보다 적립식으로 꾸준히 투자하는 게 정석이에요. #ETF #투자 #재테크',
+ 'text','{}',NULL,NULL,89,5,41,1089,'정보',false::boolean,false,420.0,NOW()-INTERVAL '4 days'),
+('20000000-0000-0000-0000-000000000062','10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000036','text',false::boolean,NULL,
+ E'직장인 연금저축펀드 vs IRP 뭐가 나을까요?',
+ E'연금 계좌 절세 혜택 받으려고 알아보는데 연금저축펀드와 IRP 중 뭐가 나을지 고민이에요. 세액공제 한도, 중도 인출 조건, 운용 자산 종류 등 차이점을 정리해주실 분 있으신가요? #연금저축 #IRP #세테크',
+ 'text','{}',NULL,NULL,54,2,27,678,'질문',false::boolean,false,267.0,NOW()-INTERVAL '2 days'),
+('20000000-0000-0000-0000-000000000063','10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000001','text',false::boolean,NULL,
+ E'울산 왕복 맛집 베스트 5 (현장 검증 완료)',
+ E'현중 근처 정말 맛있는 곳만 골랐어요!
+
+1위 🥩 언양불고기 원조집 - 울산 명물, 점심 필수 웨이팅
+2위 🍜 막국수 전문점 - 여름에 최고
+3위 🐠 회센터 - 신선도 최상, 저녁 추천
+4위 🍛 인도카레 - 색다른 점심
+5위 ☕ 로스터리카페 - 커피 맛집
+
+#울산맛집 #현중 #점심',
+ 'text','{}',NULL,NULL,78,3,29,1024,'맛집',false::boolean,false,335.5,NOW()-INTERVAL '12 hours'),
+('20000000-0000-0000-0000-000000000064','10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000011','text',false::boolean,NULL,
+ E'창원/경산 출장자를 위한 맛집 지도',
+ E'창원과 경산에 자주 출장 가는 편인데 맛집 정보 공유해요!
+
+🍱 창원 맛집:
+- 마산 아구찜 골목 (필수!)
+- 창원 중앙동 순대국밥
+
+🍱 경산 맛집:
+- 경산 한우거리 (주말만)
+- 대학가 주변 돼지국밥
+
+출장 가시는 분들께 도움 되길! #창원 #경산 #맛집',
+ 'text','{}',NULL,NULL,45,1,17,567,'맛집',false::boolean,false,196.0,NOW()-INTERVAL '3 days'),
+('20000000-0000-0000-0000-000000000065','10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000009','text',false::boolean,NULL,
+ E'점심 혼밥 vs 같이 먹기 어떻게 생각하세요?',
+ E'저는 혼밥 선호파인데요. 점심시간만큼은 조용히 쉬고 싶어서요. 그런데 팀 분위기상 같이 먹는 게 기본이라 부담될 때가 있어요. 다들 어떻게 생각하시나요? 혼밥=개인주의라는 편견도 없었으면 좋겠어요. #점심 #혼밥 #직장문화',
+ 'text','{}',NULL,NULL,56,3,38,712,'일상',false::boolean,false,325.5,NOW()-INTERVAL '1 days'),
+('20000000-0000-0000-0000-000000000066','10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000008','text',false::boolean,NULL,
+ E'울산 북구 전세 시장 현황 (2026년 4월 기준)',
+ E'울산 북구(현중 인근) 전세 시장 현황 공유드려요.
+
+- 33평형: 2억3천~2억7천
+- 25평형: 1억6천~1억9천
+- 최근 신규 입주 단지: 전세가 소폭 하락 중
+
+현중 발령받은 분들 집 구하실 때 참고하세요. 추가 정보 필요하면 댓글 주세요! #울산부동산 #전세 #HHI',
+ 'text','{}',NULL,NULL,42,1,16,534,'부동산',false::boolean,false,183.5,NOW()-INTERVAL '5 days'),
+('20000000-0000-0000-0000-000000000067','10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000021','text',false::boolean,NULL,
+ E'회사 사택 신청 조건과 꿀팁',
+ E'사택 신청 관련 정보 공유해요! 일반적으로 입사 후 1년 이내 신규 발령자, 본인 소유 주택 없는 분, 특정 지역 거주자 우선이에요. 대기 기간이 길 수 있으니 미리 신청해두는 게 좋아요. HR 포털에서 신청 가능합니다. #사택 #주거복지 #입사꿀팁',
+ 'text','{}',NULL,NULL,35,0,12,412,'정보',false::boolean,false,147.5,NOW()-INTERVAL '4 days'),
+('20000000-0000-0000-0000-000000000068','10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000010','text',false::boolean,NULL,
+ E'제네시스 GV80 vs 팰리세이드 어떤 게 나을까요?',
+ E'가족차로 SUV 구입 고민 중인데 GV80과 팰리세이드 사이에서 못 정하겠어요. 예산은 6~7천 사이고, 주 1회 이상 장거리 운행이 있어요. 실제 오너 분들 장단점 솔직하게 알려주세요! #자동차 #GV80 #팰리세이드 #SUV',
+ 'text','{}',NULL,NULL,48,2,32,678,'자동차',false::boolean,false,277.0,NOW()-INTERVAL '8 hours'),
+('20000000-0000-0000-0000-000000000069','10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000038','text',false::boolean,NULL,
+ E'전기차 첫 구매 후기 - 아이오닉6 6개월 사용기',
+ E'아이오닉6 구입한 지 6개월이 됐는데 만족도 높아요!
+
+✅ 좋은 점: 충전비 절감 (월 3만원 수준), 주행 안정성 좋음
+❌ 아쉬운 점: 장거리 충전 인프라, 겨울 배터리 감소
+
+전기차 고민 중이신 분들께 도움 되길 바랍니다! #전기차 #아이오닉6 #사용후기',
+ 'text','{}',NULL,NULL,61,3,24,712,'자동차',false::boolean,false,268.0,NOW()-INTERVAL '4 days'),
+('20000000-0000-0000-0000-000000000070','10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000033','text',false::boolean,NULL,
+ E'제주도 3박 4일 알뜰 여행 코스 (26만원으로 가능!)',
+ E'지난달 제주도 저비용 여행 다녀왔어요!
+
+✈️ 항공: 1인 4만원 (이벤트 특가)
+🏠 숙소: 게스트하우스 1박 2만원
+🍖 식비: 흑돼지 1회 + 로컬 맛집
+🚗 렌터카: 3일 15만원
+
+총 26만원대로 다녀왔습니다. 상세 일정 원하시면 댓글 주세요! #제주도 #여행 #알뜰여행',
+ 'text','{}',NULL,NULL,67,2,28,834,'여행',false::boolean,false,304.5,NOW()-INTERVAL '3 days'),
+('20000000-0000-0000-0000-000000000071','10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000015','text',false::boolean,NULL,
+ E'5월 연휴 해외여행 추천 - 일본 vs 베트남',
+ E'5월 연휴에 해외여행 계획 중인데 일본 오사카와 베트남 다낭 사이에서 고민이에요. 날씨, 음식, 비용, 볼거리 등 비교해주실 분 계신가요? 동행 2명(30대 커플)이에요. #해외여행 #일본 #베트남 #연휴',
+ 'text','{}',NULL,NULL,44,1,26,567,'여행',false::boolean,false,238.5,NOW()-INTERVAL '1 days'),
+('20000000-0000-0000-0000-000000000072','10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000002','text',false::boolean,NULL,
+ E'[판매] 아이패드 Pro 11인치 (2023) M2 - 거의 새것',
+ E'아이패드 Pro 11인치 M2 칩 판매합니다.
+
+📱 사양: iPad Pro 11, M2, 256GB, WiFi, 스페이스 그레이
+💰 가격: 90만원 (정가 129만원)
+📦 포함: 정품 박스, USB-C 케이블, 애플펜슬 2세대
+
+구입 후 5개월, 화면 흠집 없음. 직거래 우선. #중고거래 #아이패드 #애플',
+ 'text','{}',NULL,NULL,12,0,7,234,'중고',false::boolean,false,65.0,NOW()-INTERVAL '24 hours'),
+('20000000-0000-0000-0000-000000000073','10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000040','text',false::boolean,NULL,
+ E'[판매] 다이슨 청소기 V11 - 정상 작동',
+ E'다이슨 V11 무선 청소기 팝니다.
+
+🧹 모델: Dyson V11 Torque Drive
+💰 가격: 28만원 (정가 89만원)
+상태: 2년 사용, 배터리 100% 정상
+
+이사로 인해 판매합니다. 직거래만 (서울 강남). #중고거래 #다이슨 #청소기',
+ 'text','{}',NULL,NULL,9,0,5,178,'중고',false::boolean,false,47.5,NOW()-INTERVAL '2 days'),
+('20000000-0000-0000-0000-000000000074','10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000036','text',false::boolean,NULL,
+ E'[구매 희망] 모니터 27인치 이상 - 4K 선호',
+ E'4K 지원 모니터 구입하고 싶어요!
+
+🖥️ 원하는 사양: 27인치 이상, 4K, IPS 패널 (OLED도 OK)
+💰 예산: 40~60만원
+
+연락 주시면 바로 확인하겠습니다! #중고구매 #모니터 #4K',
+ 'text','{}',NULL,NULL,7,0,4,134,'중고',false::boolean,false,37.5,NOW()-INTERVAL '3 days'),
+('20000000-0000-0000-0000-000000000075','10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000004','text',false::boolean,NULL,
+ E'육아휴직 후 복직 6개월 차 솔직 후기',
+ E'육아휴직 1년 후 복직한 지 6개월이 됐어요. 복직 초반엔 업무 공백 때문에 힘들었는데 팀원들이 배려해줘서 잘 적응했어요. 육아휴직 전에 미리 업무 인수인계 문서를 잘 만들어두는 게 핵심이었어요. 고민하시는 분들 용기 내세요! #육아휴직 #복직 #경험담',
+ 'text','{}',NULL,NULL,47,1,22,567,'육아',false::boolean,false,226.0,NOW()-INTERVAL '4 days'),
+('20000000-0000-0000-0000-000000000076','10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000027','text',false::boolean,NULL,
+ E'어린이집 대기 신청 꿀팁 공유해요',
+ E'첫아이 어린이집 대기 신청하면서 배운 것들 공유해요.
+
+1️⃣ 임신 중에 미리 신청 (빠를수록 좋음)
+2️⃣ 다수 어린이집 동시 신청
+3️⃣ 직장 어린이집 우선 확인
+4️⃣ 복지로 사이트 정기 확인
+
+사내 어린이집 대기도 미리 신청해두세요! #어린이집 #육아 #꿀팁',
+ 'text','{}',NULL,NULL,38,0,14,412,'정보',false::boolean,false,165.0,NOW()-INTERVAL '3 days'),
+('20000000-0000-0000-0000-000000000077','10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000024','text',true::boolean,'익명 매',
+ E'타사 헤드헌팅 연락이 왔는데 어떻게 대응하셨나요?',
+ E'최근 헤드헌터로부터 타사 채용 제안이 왔어요. 현재 직장에 불만은 없지만 연봉이 20% 높다고 해서 고민이에요. 이런 상황에서 어떻게 대응하셨나요? 면접은 보는 게 나을지, 아니면 시장 탐색 정도로만 볼지... #이직 #헤드헌팅 #커리어',
+ 'text','{}',NULL,NULL,56,3,34,712,'고민',false::boolean,false,305.5,NOW()-INTERVAL '5 hours'),
+('20000000-0000-0000-0000-000000000078','10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000032','text',true::boolean,'익명 독수리',
+ E'5년차 엔지니어, 개발로 커리어 전환 가능할까요?',
+ E'기계 엔지니어 5년차인데 최근 디지털 전환 붐을 보면서 개발 쪽으로 커리어를 바꾸고 싶어졌어요. 주변에 비전공자 개발 전환 사례가 있으신가요? 어떤 언어부터 시작하는 게 좋을지, 현실적으로 가능한지 조언 부탁드려요. #커리어전환 #개발 #이직',
+ 'text','{}',NULL,NULL,71,5,42,934,'고민',false::boolean,false,380.0,NOW()-INTERVAL '9 hours'),
+('20000000-0000-0000-0000-000000000079','10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000011','text',true::boolean,'익명 솔개',
+ E'이직 준비할 때 포트폴리오 어떻게 만드셨어요?',
+ E'조선 기술직으로 5년 근무했는데 이직을 위한 포트폴리오를 어떻게 만들어야 할지 막막해요. 프로젝트 실적을 어느 수준까지 공개해도 되는지, 기술 문서 기밀은 어떻게 처리하는지 경험 있으신 분 조언 부탁드립니다. #이직 #포트폴리오 #커리어',
+ 'text','{}',NULL,NULL,43,2,26,567,'질문',false::boolean,false,234.5,NOW()-INTERVAL '3 days'),
+('20000000-0000-0000-0000-000000000080','10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000002','text',false::boolean,NULL,
+ E'재택근무 책상 셋업 공유 (모니터 3대 + 스탠딩)',
+ E'재택근무 환경 구축에 투자 좀 했는데 공유할게요!
+
+🖥️ 모니터: 27인치 4K 2대 + 노트북 화면 = 3화면
+📐 스탠딩 책상: 전동 스탠딩 (앉았다 일어났다 반복)
+🎧 헤드셋: 소니 WH-1000XM5 노이즈캔슬링
+
+처음엔 비싸보여도 생산성 향상을 생각하면 투자 가치 있어요! #재택근무 #홈오피스 #셋업',
+ 'text','{}',NULL,NULL,48,2,19,612,'정보',false::boolean,false,212.0,NOW()-INTERVAL '6 hours'),
+('20000000-0000-0000-0000-000000000081','10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000019','text',false::boolean,NULL,
+ E'재택 중 집중력 유지하는 나만의 루틴',
+ E'재택근무 2년차인데 효과적인 루틴 공유해요!
+
+⏰ 9시 업무 시작 전 15분 스트레칭
+🍅 포모도로 기법 (25분 집중, 5분 휴식)
+🚫 점심 후 30분 산책 (절대 낮잠 금지)
+🎵 집중 음악: 로파이 힙합 or 클래식
+
+이 루틴 실천 후 오히려 사무실보다 더 집중됩니다! #재택근무 #집중력 #루틴',
+ 'text','{}',NULL,NULL,63,4,31,789,'꿀팁',false::boolean,false,306.5,NOW()-INTERVAL '2 days'),
+('20000000-0000-0000-0000-000000000082','10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000007','text',false::boolean,NULL,
+ E'화상회의 카메라/조명 추천 (저예산 셋업)',
+ E'화상회의 많으신 분들 필독! 조명과 카메라 조금만 투자해도 인상이 확 달라져요.
+
+📷 카메라: 로지텍 C920 (5만원대, 720p도 충분)
+💡 조명: 링라이트 1만원대 충분
+
+비싼 장비보다 좋은 위치(창가)와 배경 정리가 더 중요해요! #화상회의 #재택근무 #카메라',
+ 'text','{}',NULL,NULL,45,1,22,534,'정보',false::boolean,false,221.0,NOW()-INTERVAL '4 days'),
+('20000000-0000-0000-0000-000000000083','10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000007','text',false::boolean,NULL,
+ E'Next.js 15 vs Remix - 어떤 걸 선택하셨나요?',
+ E'새 프로젝트 프레임워크 선택 중인데 Next.js 15와 Remix 사이에서 고민이에요. Server Actions, RSC 지원, 커뮤니티 크기, 러닝커브 등을 비교해봤는데 여러분은 어떤 선택 하셨나요? 실제 프로덕션 경험 있으신 분들 조언 부탁드립니다. #Nextjs #Remix #개발 #웹개발',
+ 'text','{}',NULL,NULL,54,3,28,712,'기술',false::boolean,false,270.5,NOW()-INTERVAL '3 hours'),
+('20000000-0000-0000-0000-000000000084','10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000002','text',false::boolean,NULL,
+ E'tRPC + Drizzle ORM 조합 실무 후기',
+ E'6개월째 tRPC + Drizzle ORM 조합으로 풀스택 개발 중인데 정말 만족스러워요!
+
+✅ 장점: 타입 안전성 100%, DB 스키마→타입 자동 생성, API 자동완성
+✅ 단점: 러닝커브, RSC와 통합 어려움
+
+백엔드 따로 없이 Next.js 단일 앱으로 운영하기 최적! #tRPC #DrizzleORM #TypeScript',
+ 'text','{}',NULL,NULL,67,4,32,834,'기술',false::boolean,false,321.5,NOW()-INTERVAL '2 days'),
+('20000000-0000-0000-0000-000000000085','10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000036','text',false::boolean,NULL,
+ E'Kubernetes 입문 - 조선소 MES 시스템 컨테이너화 경험',
+ E'기존 레거시 MES 시스템을 도커/쿠버네티스로 마이그레이션한 경험을 공유합니다. 가장 어려웠던 점은 상태를 가진 서비스(DB, 파일 스토리지) 처리였어요. 6개월간의 삽질 끝에 안정화된 시스템 구축 성공! 비슷한 작업 하시는 분들께 도움이 됐으면 해요. #Kubernetes #Docker #MES #DevOps',
+ 'text','{}',NULL,NULL,45,2,19,567,'기술',false::boolean,false,204.5,NOW()-INTERVAL '5 days'),
+('20000000-0000-0000-0000-000000000086','10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000017','text',false::boolean,NULL,
+ E'Notion 팀 워크스페이스 1년 사용 후기',
+ E'팀 전체 Notion으로 전환한 지 1년이 됐어요. 회의록, 프로젝트 관리, 위키 모두 Notion으로 통합했는데 만족도 높아요.
+
+✅ 좋은 점: 빠른 검색, 협업 용이, 템플릿 다양
+❌ 아쉬운 점: 오프라인 지원 약함, 복잡한 DB 느림
+
+도입 고민하시는 팀 있으면 경험 공유해드릴게요! #Notion #생산성 #팀협업',
+ 'text','{}',NULL,NULL,38,1,16,489,'리뷰',false::boolean,false,173.5,NOW()-INTERVAL '4 days'),
+('20000000-0000-0000-0000-000000000087','10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000031','text',false::boolean,NULL,
+ E'슬랙 vs 팀즈 vs 카카오워크 비교 (실무 관점)',
+ E'세 가지 협업 툴을 모두 써본 입장에서 솔직한 비교!
+
+💬 Slack: 인테그레이션 최강, 비싸지만 개발팀엔 최고
+💬 Teams: MS 생태계와 통합 완벽, UI가 좀 무거움
+💬 카카오워크: 한국형 UI, 무료 플랜 괜찮음
+
+팀 규모와 예산에 따라 선택하세요! #Slack #Teams #협업툴',
+ 'text','{}',NULL,NULL,52,2,24,634,'리뷰',false::boolean,false,247.0,NOW()-INTERVAL '2 days'),
+('20000000-0000-0000-0000-000000000088','10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000006','text',false::boolean,NULL,
+ E'입사 3개월 차 솔직 후기 - 기대와 현실',
+ E'HD현대그룹에 입사한 지 3개월이 됐어요. 솔직하게 후기 남겨볼게요.
+
+👍 좋은 점: 안정적인 복지, 친절한 선배들, 체계적인 온보딩
+👎 아쉬운 점: 생각보다 수직적인 문화, 결재 라인 복잡
+
+전반적으로 만족스럽고, 잘 적응하고 있습니다. 예비 입사자분들 참고 되길! #온보딩 #신입 #솔직후기',
+ 'text','{}',NULL,NULL,58,3,29,712,'경험담',false::boolean,false,285.5,NOW()-INTERVAL '5 hours'),
+('20000000-0000-0000-0000-000000000089','10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000037','text',false::boolean,NULL,
+ E'신입사원이 알면 좋을 꿀팁 모음 (사수 없이 독학)',
+ E'사수 없이 적응하면서 배운 것들 공유할게요!
+
+1️⃣ 사내 인트라넷 완전 숙지 (공지 놓치지 말기)
+2️⃣ 복지포인트 분기마다 꼭 사용
+3️⃣ HR 포털에서 교육 신청 가능 (유료과정 무료)
+4️⃣ 사내 커뮤니티 적극 활용
+
+추가로 궁금한 거 있으면 댓글 주세요! #신입사원 #꿀팁 #온보딩',
+ 'text','{}',NULL,NULL,72,2,34,834,'정보',false::boolean,false,347.0,NOW()-INTERVAL '3 days'),
+('20000000-0000-0000-0000-000000000090','10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000020','text',true::boolean,'익명 제비',
+ E'번아웃이 심한데 어떻게 극복하셨나요?',
+ E'최근 6개월간 프로젝트를 무리하게 진행하다 완전히 방전된 느낌이에요. 출근하기 싫고, 집중도 안 되고, 아무것도 하기 싫은 상태예요. 이런 번아웃을 경험하셨던 분들, 어떻게 극복하셨나요? 주변에 말하기 어려워서 이곳에 털어놓아요. #번아웃 #직장생활 #고민',
+ 'text','{}',NULL,NULL,94,6,63,1234,'고민',false::boolean,false,541.0,NOW()-INTERVAL '4 hours'),
+('20000000-0000-0000-0000-000000000091','10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000034','text',true::boolean,'익명 갈매기',
+ E'팀장이 공을 가로채는 것 같아요',
+ E'제가 아이디어를 내고 기획한 프로젝트인데 팀장님이 임원 보고 때 자신의 공로처럼 이야기하는 걸 들었어요. 직접 말하기가 어려운데 이런 상황에서 어떻게 대처하셨나요? 억울하고 의욕이 떨어지네요. #공로가로채기 #팀장 #억울',
+ 'text','{}',NULL,NULL,112,8,78,1567,'고민',false::boolean,false,658.0,NOW()-INTERVAL '7 hours'),
+('20000000-0000-0000-0000-000000000092','10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000017','text',true::boolean,'익명 두루미',
+ E'직장 내 왕따 같은 분위기를 겪고 있어요',
+ E'팀에서 저만 대화에서 제외되고, 업무 정보도 늦게 받는 것 같아요. 의도적인지 아닌지 모르겠지만 너무 힘들어요. 이런 상황에서 신고하면 오히려 더 안 좋아질 것 같고... 어떻게 대처하셨나요? 도움 주실 분 계신가요? #직장내괴롭힘 #고민 #도움요청',
+ 'text','{}',NULL,NULL,89,4,54,1078,'고민',false::boolean,false,486.5,NOW()-INTERVAL '9 hours'),
+('20000000-0000-0000-0000-000000000093','10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000003','text',true::boolean,'익명 호랑이',
+ E'HD현대중공업 연차별 연봉 대략적으로 공유해봐요',
+ E'솔직하게 공유해봐요 (실수령 기준 아님, 세전 연봉)
+
+🔹 1년차 사원: 4200~4500
+🔹 5년차 대리: 5500~6200
+🔹 10년차 과장: 6800~7500
+🔹 차장: 8000~9000+
+
+성과급, 직군, 부서마다 편차 있어요. 다른 분들 범위 공유해주세요! #연봉공유 #HHI #임금',
+ 'text','{}',NULL,NULL,134,9,87,1789,'연봉',false::boolean,false,756.5,NOW()-INTERVAL '3 hours'),
+('20000000-0000-0000-0000-000000000094','10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000029','text',true::boolean,'익명 사자',
+ E'5.5% 연봉 인상률 어떻게 생각하세요?',
+ E'올해 연봉 인상률이 5.5%로 나왔는데 물가 상승률 대비 실질 임금은 올랐는지 의문이에요. 다른 그룹사 분들은 어느 정도 받으셨나요? 협상 여지가 있는지도 궁금하고요. #연봉인상 #급여 #실질임금',
+ 'text','{}',NULL,NULL,98,7,62,1234,'연봉',false::boolean,false,544.5,NOW()-INTERVAL '1 days'),
+('20000000-0000-0000-0000-000000000095','10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000011','text',true::boolean,'익명 표범',
+ E'복지포인트 60만원 알뜰하게 쓰는 법',
+ E'복지포인트 최대한 활용하는 방법들!
+
+💡 자기계발: 인프런, 클래스101 (IT 강의 50% 할인)
+💡 헬스장: 제휴 스포츠센터 등록
+💡 문화생활: 영화, 공연 티켓
+💡 건강검진 추가 항목
+
+복지몰보다 제휴 기관 활용이 더 알뜰해요! #복지포인트 #꿀팁 #알뜰',
+ 'text','{}',NULL,NULL,67,3,41,834,'정보',false::boolean,false,368.0,NOW()-INTERVAL '2 days'),
+('20000000-0000-0000-0000-000000000096','10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000005','text',true::boolean,'익명 늑대',
+ E'칭찬을 공개적으로, 피드백을 개인적으로 주는 팀장님',
+ E'우리 팀장님은 잘한 일은 팀 전체 앞에서 칭찬하시고, 부족한 점은 반드시 1:1로 따로 피드백 주세요. 처음엔 그게 당연한 줄 알았는데 다른 팀 이야기 들으니까 정말 좋은 리더십이더라고요. 이런 팀장님 밑에서 일하는 게 얼마나 행복한 건지 새삼 느껴요. #좋은팀장 #리더십 #감사',
+ 'text','{}',NULL,NULL,89,1,34,934,'칭찬',false::boolean,false,391.0,NOW()-INTERVAL '6 hours'),
+('20000000-0000-0000-0000-000000000097','10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000022','text',true::boolean,'익명 늑대2',
+ E'"왜 이것도 못 하냐"는 말이 너무 상처예요',
+ E'실수를 하면 공개적으로 "왜 이것도 못 하냐"고 하시는 팀장님... 입사 2년차인데 아직도 이 말을 들을 때마다 눈물이 나요. 보고하기가 점점 무서워지고 있어요. 이런 상황에서 어떻게 대처하셨나요? #상사갈등 #직장생활 #힘들어',
+ 'text','{}',NULL,NULL,134,8,89,1678,'고민',false::boolean,false,768.0,NOW()-INTERVAL '4 hours'),
+('20000000-0000-0000-0000-000000000098','10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000034','text',true::boolean,'익명 여우2',
+ E'회식 강요하는 상사, 어떻게 거절하세요?',
+ E'월 2~3회 의무 참석 분위기의 회식이 너무 힘들어요. 거절하면 팀 분위기를 흐린다는 느낌이 들고, 억지로 참석하면 다음날 너무 힘들고요. 부드럽게 거절하는 방법이나 경험 있으신 분 조언 부탁드려요. #회식 #상사 #거절',
+ 'text','{}',NULL,NULL,98,6,67,1189,'고민',false::boolean,false,571.0,NOW()-INTERVAL '2 days'),
+('20000000-0000-0000-0000-000000000099','10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000016','text',true::boolean,'익명 오리',
+ E'야근 없이 퇴근하는 게 죄인인 것 같아요',
+ E'정시 퇴근하면 팀장님 눈치가 느껴져요. 업무는 다 했고 초과 업무도 없는데 칼퇴하면 불성실하다는 시선이... 이런 문화 언제쯤 바뀔까요? 워라밸을 지키는 게 왜 이렇게 어려운 건지. #야근 #워라밸 #직장문화',
+ 'text','{}',NULL,NULL,112,7,72,1345,'고민',false::boolean,false,629.5,NOW()-INTERVAL '5 hours'),
+('20000000-0000-0000-0000-000000000100','10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000028','text',true::boolean,'익명 오소리',
+ E'번아웃 방지를 위한 나만의 퇴근 후 루틴 공유',
+ E'퇴근 후 완전히 일 생각을 끊는 루틴이 생기고 나서 번아웃이 없어졌어요!
+
+🏃 퇴근 후 30분 달리기 (머리 환기)
+📵 슬랙 알림 완전 끄기
+🍳 직접 요리해서 먹기
+📚 15분 독서 후 취침
+
+이 루틴 만들기 전에는 퇴근 후에도 일 생각뿐이었는데 이제는 확실히 달라요! #워라밸 #퇴근루틴 #번아웃방지',
+ 'text','{}',NULL,NULL,87,4,48,1023,'꿀팁',false::boolean,false,451.5,NOW()-INTERVAL '3 days');
+
+COMMIT;
+
+-- =============================================================
+-- PART 5: COMMENTS (73개)
+-- =============================================================
+BEGIN;
+
+INSERT INTO comments (id, post_id, author_id, parent_id, is_anonymous, anon_number, content, upvote_count, depth, is_deleted, created_at)
+VALUES
+('30000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000002',NULL,false::boolean,0,E'저도 온보딩 때 혼자 찾아다닌 게 너무 많았어요. 멘토 배정 프로그램이 있으면 정말 좋겠어요!',8,0,false,NOW()-INTERVAL '2 hours'),
+('30000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000005',NULL,false::boolean,0,E'입사 직후 팀 문화나 불문율 같은 걸 미리 알았으면 적응이 훨씬 쉬웠을 것 같아요.',6,0,false,NOW()-INTERVAL '2 hours'),
+('30000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000006','30000000-0000-0000-0000-000000000002',false::boolean,0,E'맞아요, 저도 처음에 보고 양식 찾는 데만 이틀 걸렸어요 ㅠ',4,1,false,NOW()-INTERVAL '1 hours'),
+('30000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000007',NULL,false::boolean,0,E'저는 배경음악으로 로파이 힙합 틀어요. lofi girl 유튜브 채널 강추!',12,0,false,NOW()-INTERVAL '3 hours'),
+('30000000-0000-0000-0000-000000000005','20000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000003',NULL,false::boolean,0,E'포모도로 앱 추천: Forest 앱이요! 집중 시간 동안 나무가 자라는데 도중에 폰 켜면 나무 죽어서 억지로라도 집중하게 돼요 ㅎㅎ',15,0,false,NOW()-INTERVAL '4 hours'),
+('30000000-0000-0000-0000-000000000006','20000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000009','30000000-0000-0000-0000-000000000004',false::boolean,0,E'저도 Forest 써요! 도구 추천 감사합니다. 근데 저는 결국 컴퓨터로 딴짓을... ㅋㅋ',8,1,false,NOW()-INTERVAL '3 hours'),
+('30000000-0000-0000-0000-000000000007','20000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000001',NULL,false::boolean,0,E'저는 업무 시작할 때 오늘 할 일 목록 3개만 종이에 적어요. 간단하지만 효과 있어요.',10,0,false,NOW()-INTERVAL '2 hours'),
+('30000000-0000-0000-0000-000000000008','20000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000013','30000000-0000-0000-0000-000000000007',false::boolean,0,E'아날로그 방식이 오히려 효과적이더라고요. 저도 해봐야겠어요!',5,1,false,NOW()-INTERVAL '1 hours'),
+('30000000-0000-0000-0000-000000000009','20000000-0000-0000-0000-000000000010','00000000-0000-0000-0000-000000000003',NULL,false::boolean,0,E'이직은 항상 어렵죠. 저는 연봉보다 성장 가능성을 더 중요하게 봤어요.',18,0,false,NOW()-INTERVAL '5 hours'),
+('30000000-0000-0000-0000-000000000010','20000000-0000-0000-0000-000000000010','00000000-0000-0000-0000-000000000007',NULL,false::boolean,0,E'일단 면접은 가보는 게 좋다고 생각해요. 현재 시장 가치를 파악하는 것만으로도 의미 있어요.',22,0,false,NOW()-INTERVAL '6 hours'),
+('30000000-0000-0000-0000-000000000011','20000000-0000-0000-0000-000000000010','00000000-0000-0000-0000-000000000011','30000000-0000-0000-0000-000000000010',false::boolean,0,E'맞아요 "오퍼 확인"이라는 마인드로 면접 보면 오히려 여유롭게 대응할 수 있어요.',15,1,false,NOW()-INTERVAL '5 hours'),
+('30000000-0000-0000-0000-000000000012','20000000-0000-0000-0000-000000000010','00000000-0000-0000-0000-000000000014',NULL,false::boolean,0,E'복지 체계를 비교해보세요. 연봉 1500만원 차이도 퇴직금, 인센티브, 복지포인트 합산하면 달라질 수 있어요.',19,0,false,NOW()-INTERVAL '4 hours'),
+('30000000-0000-0000-0000-000000000013','20000000-0000-0000-0000-000000000010','00000000-0000-0000-0000-000000000016',NULL,false::boolean,0,E'6년차면 회사에서도 핵심 인재일 텐데요. 현 직장에서 솔직하게 성장 계획을 물어봐도 좋을 것 같아요.',14,0,false,NOW()-INTERVAL '3 hours'),
+('30000000-0000-0000-0000-000000000014','20000000-0000-0000-0000-000000000011','00000000-0000-0000-0000-000000000002',NULL,false::boolean,0,E'잡플래닛, 원티드, 링크드인에서 유사 직무 공고 연봉 범위를 캡처해두면 좋은 근거가 돼요.',16,0,false,NOW()-INTERVAL '1 hours'),
+('30000000-0000-0000-0000-000000000015','20000000-0000-0000-0000-000000000011','00000000-0000-0000-0000-000000000008',NULL,false::boolean,0,E'전 "OO 연봉 수준"이 아니라 "제가 기여한 OO 성과"를 근거로 제시했어요. 수치화가 핵심이에요.',21,0,false,NOW()-INTERVAL '1 hours'),
+('30000000-0000-0000-0000-000000000016','20000000-0000-0000-0000-000000000011','00000000-0000-0000-0000-000000000014','30000000-0000-0000-0000-000000000014',false::boolean,0,E'성과 수치화 정말 중요해요. 저는 "이 프로젝트로 연간 비용 XX원 절감"이라고 했더니 인상 폭이 달랐어요.',12,1,false,NOW()-INTERVAL '0 hours'),
+('30000000-0000-0000-0000-000000000017','20000000-0000-0000-0000-000000000011','00000000-0000-0000-0000-000000000005',NULL,false::boolean,0,E'처음 협상 시작할 때 "제 목표 금액은 X입니다"라고 먼저 숫자를 던지는 게 효과적이라고 들었어요.',14,0,false,NOW()-INTERVAL '0 hours'),
+('30000000-0000-0000-0000-000000000018','20000000-0000-0000-0000-000000000012','00000000-0000-0000-0000-000000000004',NULL,false::boolean,0,E'정말 힘드시겠어요. 저도 비슷한 경험 있었는데 결국 팀장님과 1:1 미팅 요청해서 업무 자율성에 대해 솔직하게 이야기했어요.',24,0,false,NOW()-INTERVAL '8 hours'),
+('30000000-0000-0000-0000-000000000019','20000000-0000-0000-0000-000000000012','00000000-0000-0000-0000-000000000009',NULL,false::boolean,0,E'매번 체크받기 귀찮으면 역으로 선제적으로 보고해보세요. "어제 이런 것 했고, 오늘 이거 할 예정입니다" 식으로요. 신뢰가 쌓이면 체크가 줄어요.',28,0,false,NOW()-INTERVAL '7 hours'),
+('30000000-0000-0000-0000-000000000020','20000000-0000-0000-0000-000000000012','00000000-0000-0000-0000-000000000016','30000000-0000-0000-0000-000000000019',false::boolean,0,E'이 방법 진짜 효과적이에요! 저도 이렇게 하니까 팀장님이 먼저 체크 안 하셔도 된다고 하셨어요.',18,1,false,NOW()-INTERVAL '6 hours'),
+('30000000-0000-0000-0000-000000000021','20000000-0000-0000-0000-000000000012','00000000-0000-0000-0000-000000000003',NULL,false::boolean,0,E'그런 분들은 대부분 불안감 때문에 마이크로매니징을 해요. 팀장님 입장에서 "이 사람이 잘 하고 있구나"라는 신뢰를 주는 게 핵심이에요.',22,0,false,NOW()-INTERVAL '5 hours'),
+('30000000-0000-0000-0000-000000000022','20000000-0000-0000-0000-000000000012','00000000-0000-0000-0000-000000000007',NULL,true::boolean,1,E'솔직히 그 분이 바뀌기 기대하기 어려울 수도 있어요. 너무 힘들면 팀 이동 신청도 고려해보세요.',16,0,false,NOW()-INTERVAL '4 hours'),
+('30000000-0000-0000-0000-000000000023','20000000-0000-0000-0000-000000000014','00000000-0000-0000-0000-000000000004',NULL,false::boolean,0,E'저도 육아휴직 1년 쓰고 복직했어요. 팀에서 처음엔 어색했지만 잘 적응했어요. 걱정만큼 현실은 나쁘지 않아요!',28,0,false,NOW()-INTERVAL '4 hours'),
+('30000000-0000-0000-0000-000000000024','20000000-0000-0000-0000-000000000014','00000000-0000-0000-0000-000000000015',NULL,false::boolean,0,E'법적으로 보장된 권리예요. 주변 눈치 볼 필요 없어요. 다만 복직 후 업무 파악 기간을 넉넉히 잡아두세요.',32,0,false,NOW()-INTERVAL '3 hours'),
+('30000000-0000-0000-0000-000000000025','20000000-0000-0000-0000-000000000014','00000000-0000-0000-0000-000000000027','30000000-0000-0000-0000-000000000023',false::boolean,0,E'저도 복직할 때 두려웠는데 팀원들이 많이 배려해줬어요. 용기 내세요!',20,1,false,NOW()-INTERVAL '3 hours'),
+('30000000-0000-0000-0000-000000000026','20000000-0000-0000-0000-000000000014','00000000-0000-0000-0000-000000000039',NULL,false::boolean,0,E'HR 관점에서 말씀드리면, 육아휴직 사용 자체가 불이익 사유가 되면 안 됩니다. 만약 불이익을 당하신다면 HR에 신고해 주세요.',35,0,false,NOW()-INTERVAL '2 hours'),
+('30000000-0000-0000-0000-000000000027','20000000-0000-0000-0000-000000000014','00000000-0000-0000-0000-000000000008',NULL,true::boolean,2,E'제 경험상 복직 후 평가에 약간의 영향은 있었어요. 부서마다 다를 수 있어서... 미리 팀장님과 솔직하게 이야기해 두세요.',18,0,false,NOW()-INTERVAL '2 hours'),
+('30000000-0000-0000-0000-000000000028','20000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000001',NULL,false::boolean,0,E'대박 좋은 아이디어에요! 음식 낭비 줄이는 효과도 기대되고요.',14,0,false,NOW()-INTERVAL '6 hours'),
+('30000000-0000-0000-0000-000000000029','20000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000009',NULL,false::boolean,0,E'이미 몇몇 회사에서 운영하는데 만족도가 높다고 들었어요. 도입 꼭 해주세요!',18,0,false,NOW()-INTERVAL '5 hours'),
+('30000000-0000-0000-0000-000000000030','20000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000033','30000000-0000-0000-0000-000000000028',false::boolean,0,E'운영 방식이 중요할 것 같아요. 단순 투표 vs 가중치 투표 등 검토 필요해보여요.',10,1,false,NOW()-INTERVAL '4 hours'),
+('30000000-0000-0000-0000-000000000031','20000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000040',NULL,false::boolean,0,E'이 아이디어, 다음 달 커뮤니티 운영회의에서 안건으로 올려볼게요! 관심 가져주셔서 감사합니다.',22,0,false,NOW()-INTERVAL '3 hours'),
+('30000000-0000-0000-0000-000000000032','20000000-0000-0000-0000-000000000057','00000000-0000-0000-0000-000000000001',NULL,true::boolean,1,E'진심으로 축하드려요!! 이런 후기 들으면 소개팅 게시판 의미가 있다는 게 느껴져요.',34,0,false,NOW()-INTERVAL '3 hours'),
+('30000000-0000-0000-0000-000000000033','20000000-0000-0000-0000-000000000057','00000000-0000-0000-0000-000000000009',NULL,true::boolean,2,E'와 감동이에요ㅠㅠ 저도 용기 내봐야겠네요.',28,0,false,NOW()-INTERVAL '2 hours'),
+('30000000-0000-0000-0000-000000000034','20000000-0000-0000-0000-000000000057','00000000-0000-0000-0000-000000000033',NULL,true::boolean,3,E'어느 회사 소속이셨는지 혹시 여쭤봐도 될까요?? 부럽습니다!',19,0,false,NOW()-INTERVAL '2 hours'),
+('30000000-0000-0000-0000-000000000035','20000000-0000-0000-0000-000000000057','00000000-0000-0000-0000-000000000040',NULL,true::boolean,4,E'동료 커플 정말 낭만적이에요 ✨ 두 분 앞날에 축복을!',31,0,false,NOW()-INTERVAL '1 hours'),
+('30000000-0000-0000-0000-000000000036','20000000-0000-0000-0000-000000000057','00000000-0000-0000-0000-000000000005',NULL,true::boolean,5,E'사내 소개팅으로 결혼까지! 진짜 레전드 후기네요. 결혼식 날짜 잡히면 알려주세요 ㅋㅋ',24,0,false,NOW()-INTERVAL '1 hours'),
+('30000000-0000-0000-0000-000000000037','20000000-0000-0000-0000-000000000060','00000000-0000-0000-0000-000000000014',NULL,false::boolean,0,E'조선 업황은 좋은데 원/달러 환율이 변수예요. 수주는 달러로, 원가는 원화로 지출하니까요.',21,0,false,NOW()-INTERVAL '3 hours'),
+('30000000-0000-0000-0000-000000000038','20000000-0000-0000-0000-000000000060','00000000-0000-0000-0000-000000000020',NULL,false::boolean,0,E'단기 트레이딩보다 장기 보유 관점으로 보는 게 맞는 것 같아요. 2028년 조선소 풀가동 예정이라 그때까지 홀딩.',18,0,false,NOW()-INTERVAL '2 hours'),
+('30000000-0000-0000-0000-000000000039','20000000-0000-0000-0000-000000000060','00000000-0000-0000-0000-000000000036','30000000-0000-0000-0000-000000000037',false::boolean,0,E'환율 헤지 포지션이 얼마나 되는지가 핵심이죠. 지난 실적발표에서 공개됐는데 꽤 잘 방어하고 있더라고요.',14,1,false,NOW()-INTERVAL '1 hours'),
+('30000000-0000-0000-0000-000000000040','20000000-0000-0000-0000-000000000061','00000000-0000-0000-0000-000000000001',NULL,false::boolean,0,E'VOO vs VTI 논쟁도 있는데 초보라면 VOO가 낫다는 의견이 많아요.',16,0,false,NOW()-INTERVAL '4 hours'),
+('30000000-0000-0000-0000-000000000041','20000000-0000-0000-0000-000000000061','00000000-0000-0000-0000-000000000005',NULL,false::boolean,0,E'QQQM (QQQ의 소형 버전)도 수수료 저렴해서 추천드려요! 적립식으로 매월 일정액 투자하는 게 최고',19,0,false,NOW()-INTERVAL '3 hours'),
+('30000000-0000-0000-0000-000000000042','20000000-0000-0000-0000-000000000061','00000000-0000-0000-0000-000000000025','30000000-0000-0000-0000-000000000040',false::boolean,0,E'맞아요 QQQM 수수료 0.15%라 QQQ(0.2%)보다 낫죠. 차이가 장기적으로 보면 꽤 됩니다.',12,1,false,NOW()-INTERVAL '2 hours'),
+('30000000-0000-0000-0000-000000000043','20000000-0000-0000-0000-000000000080','00000000-0000-0000-0000-000000000003',NULL,false::boolean,0,E'스탠딩 책상 저도 쓰는데 허리 건강에 정말 좋아요. 처음 2주는 어색했는데 이제 없으면 안 됩니다.',13,0,false,NOW()-INTERVAL '5 hours'),
+('30000000-0000-0000-0000-000000000044','20000000-0000-0000-0000-000000000080','00000000-0000-0000-0000-000000000019',NULL,false::boolean,0,E'노이즈캔슬링 헤드셋은 재택근무 필수템이에요. 소니 말고 보스 QC45도 괜찮습니다!',11,0,false,NOW()-INTERVAL '4 hours'),
+('30000000-0000-0000-0000-000000000045','20000000-0000-0000-0000-000000000080','00000000-0000-0000-0000-000000000024','30000000-0000-0000-0000-000000000043',false::boolean,0,E'스탠딩 책상 추천 제품 있으세요? 저는 플렉시스팟 고민 중이에요.',8,1,false,NOW()-INTERVAL '3 hours'),
+('30000000-0000-0000-0000-000000000046','20000000-0000-0000-0000-000000000080','00000000-0000-0000-0000-000000000002','30000000-0000-0000-0000-000000000045',false::boolean,0,E'플렉시스팟 E7 쓰는데 만족도 높아요! 가성비 최고.',10,2,false,NOW()-INTERVAL '2 hours'),
+('30000000-0000-0000-0000-000000000047','20000000-0000-0000-0000-000000000083','00000000-0000-0000-0000-000000000007',NULL,false::boolean,0,E'Next.js 15 RSC + Server Actions 조합이 진짜 게임체인저예요. 기존 API Route 방식보다 훨씬 깔끔해요.',16,0,false,NOW()-INTERVAL '3 hours'),
+('30000000-0000-0000-0000-000000000048','20000000-0000-0000-0000-000000000083','00000000-0000-0000-0000-000000000002',NULL,false::boolean,0,E'Remix가 웹 표준에 더 충실하고 Progressive Enhancement 철학이 명확해서 좋아요. 근데 생태계가 작은 게 단점.',14,0,false,NOW()-INTERVAL '2 hours'),
+('30000000-0000-0000-0000-000000000049','20000000-0000-0000-0000-000000000083','00000000-0000-0000-0000-000000000036','30000000-0000-0000-0000-000000000047',false::boolean,0,E'Server Actions 처음엔 어색한데 익숙해지면 진짜 편합니다. 폼 처리가 극단적으로 단순해져요.',11,1,false,NOW()-INTERVAL '1 hours'),
+('30000000-0000-0000-0000-000000000050','20000000-0000-0000-0000-000000000090','00000000-0000-0000-0000-000000000004',NULL,true::boolean,1,E'저도 작년에 심한 번아웃을 겪었어요. 무기력함이 너무 심해서 병가를 냈었는데, 그게 오히려 도움이 됐어요.',28,0,false,NOW()-INTERVAL '4 hours'),
+('30000000-0000-0000-0000-000000000051','20000000-0000-0000-0000-000000000090','00000000-0000-0000-0000-000000000022',NULL,true::boolean,2,E'번아웃은 쉬는 게 먼저예요. 연차를 쓰거나, 주말에 완전히 일에서 분리되는 경험이 필요해요.',32,0,false,NOW()-INTERVAL '3 hours'),
+('30000000-0000-0000-0000-000000000052','20000000-0000-0000-0000-000000000090','00000000-0000-0000-0000-000000000034','30000000-0000-0000-0000-000000000050',true::boolean,3,E'맞아요. 번아웃 상태에서 더 열심히 하려다가 오히려 더 심해졌어요. 진단받고 치료받는 게 용기 있는 선택이에요.',24,1,false,NOW()-INTERVAL '3 hours'),
+('30000000-0000-0000-0000-000000000053','20000000-0000-0000-0000-000000000090','00000000-0000-0000-0000-000000000039',NULL,false::boolean,0,E'번아웃은 개인 문제가 아니라 조직적 문제일 수 있어요. HR에서도 지원 프로그램 마련을 고려하겠습니다.',35,0,false,NOW()-INTERVAL '2 hours'),
+('30000000-0000-0000-0000-000000000054','20000000-0000-0000-0000-000000000090','00000000-0000-0000-0000-000000000001',NULL,true::boolean,4,E'전문 상담사와 면담해보시는 것도 추천해요. 사내 EAP(직원지원프로그램) 활용해보세요!',27,0,false,NOW()-INTERVAL '2 hours'),
+('30000000-0000-0000-0000-000000000055','20000000-0000-0000-0000-000000000091','00000000-0000-0000-0000-000000000003',NULL,true::boolean,1,E'진짜 너무 화나는 상황이네요. 저라면 다음번엔 임원 보고 자리에 꼭 동석하겠어요.',32,0,false,NOW()-INTERVAL '7 hours'),
+('30000000-0000-0000-0000-000000000056','20000000-0000-0000-0000-000000000091','00000000-0000-0000-0000-000000000009',NULL,true::boolean,2,E'이메일이나 문서로 먼저 제안한 기록을 남겨두세요. 나중에 증거가 돼요.',38,0,false,NOW()-INTERVAL '6 hours'),
+('30000000-0000-0000-0000-000000000057','20000000-0000-0000-0000-000000000091','00000000-0000-0000-0000-000000000016','30000000-0000-0000-0000-000000000056',true::boolean,3,E'이 방법 진짜 중요해요. 저도 비슷한 경험 후부터 항상 이메일로 기록 남겨요.',26,1,false,NOW()-INTERVAL '5 hours'),
+('30000000-0000-0000-0000-000000000058','20000000-0000-0000-0000-000000000091','00000000-0000-0000-0000-000000000020',NULL,true::boolean,4,E'솔직히 말씀드리면, 팀장님 입장에서 당연하다고 생각할 수도 있어요. 팀 성과를 대표해서 발표하는 게 리더 역할이라고요. 하지만 구성원에게 크레딧을 주는 것도 리더십이죠.',22,0,false,NOW()-INTERVAL '4 hours'),
+('30000000-0000-0000-0000-000000000059','20000000-0000-0000-0000-000000000091','00000000-0000-0000-0000-000000000007',NULL,true::boolean,5,E'임원 보고 때 다음엔 직접 발표를 요청해보세요. "이 프로젝트 제가 직접 설명드려도 될까요?"라고.',34,0,false,NOW()-INTERVAL '3 hours'),
+('30000000-0000-0000-0000-000000000060','20000000-0000-0000-0000-000000000093','00000000-0000-0000-0000-000000000001',NULL,true::boolean,1,E'저는 5년차 과장인데 공유해주신 범위랑 비슷해요. 성과급이 변수가 크더라고요.',29,0,false,NOW()-INTERVAL '3 hours'),
+('30000000-0000-0000-0000-000000000061','20000000-0000-0000-0000-000000000093','00000000-0000-0000-0000-000000000012',NULL,true::boolean,2,E'부서마다 편차가 크죠. 기술직군이랑 사무직군 차이도 있고요.',24,0,false,NOW()-INTERVAL '2 hours'),
+('30000000-0000-0000-0000-000000000062','20000000-0000-0000-0000-000000000093','00000000-0000-0000-0000-000000000025','30000000-0000-0000-0000-000000000060',true::boolean,3,E'기본급 + 성과급 + 기타 수당 합산이 중요해요. 기본급만 비교하면 오해 생겨요.',18,1,false,NOW()-INTERVAL '2 hours'),
+('30000000-0000-0000-0000-000000000063','20000000-0000-0000-0000-000000000097','00000000-0000-0000-0000-000000000004',NULL,true::boolean,1,E'정말 힘드시겠어요ㅠㅠ 그런 말은 명백한 언어적 괴롭힘이에요.',34,0,false,NOW()-INTERVAL '4 hours'),
+('30000000-0000-0000-0000-000000000064','20000000-0000-0000-0000-000000000097','00000000-0000-0000-0000-000000000009',NULL,true::boolean,2,E'인사팀에 상담해보세요. 기록도 해두시고요. 요즘은 직장 내 괴롭힘으로 신고 가능해요.',42,0,false,NOW()-INTERVAL '3 hours'),
+('30000000-0000-0000-0000-000000000065','20000000-0000-0000-0000-000000000097','00000000-0000-0000-0000-000000000016','30000000-0000-0000-0000-000000000064',true::boolean,3,E'신고 이전에 HR 담당자와 비공개 상담부터 해보세요. 어떤 선택지가 있는지 파악하고 결정하는 게 나아요.',28,1,false,NOW()-INTERVAL '3 hours'),
+('30000000-0000-0000-0000-000000000066','20000000-0000-0000-0000-000000000097','00000000-0000-0000-0000-000000000022',NULL,true::boolean,4,E'저도 비슷한 경험 있었어요. 당시엔 너무 힘들었는데 팀 이동 신청하고 나서 완전히 달라졌어요. 방법은 있어요.',31,0,false,NOW()-INTERVAL '2 hours'),
+('30000000-0000-0000-0000-000000000067','20000000-0000-0000-0000-000000000097','00000000-0000-0000-0000-000000000034',NULL,true::boolean,5,E'그런 말 버티는 게 능력이 아니에요. 본인 자신을 지키는 게 먼저예요.',38,0,false,NOW()-INTERVAL '1 hours'),
+('30000000-0000-0000-0000-000000000068','20000000-0000-0000-0000-000000000099','00000000-0000-0000-0000-000000000003',NULL,true::boolean,1,E'이런 문화 정말 바뀌어야 해요. 성과로 평가받아야지, 시간으로 평가받으면 안 되죠.',28,0,false,NOW()-INTERVAL '5 hours'),
+('30000000-0000-0000-0000-000000000069','20000000-0000-0000-0000-000000000099','00000000-0000-0000-0000-000000000007',NULL,true::boolean,2,E'칼퇴하면서 성과로 보여주는 수밖에 없어요. 본인 일 다 끝냈으면 당당하게 퇴근해도 됩니다.',32,0,false,NOW()-INTERVAL '4 hours'),
+('30000000-0000-0000-0000-000000000070','20000000-0000-0000-0000-000000000099','00000000-0000-0000-0000-000000000015',NULL,true::boolean,3,E'팀장님에게 "업무 다 완료했는데 오늘은 먼저 퇴근하겠습니다"라고 말하고 나가보세요. 눈치 보다가 시작되는 야근 문화가 더 나빠요.',26,0,false,NOW()-INTERVAL '3 hours'),
+('30000000-0000-0000-0000-000000000071','20000000-0000-0000-0000-000000000100','00000000-0000-0000-0000-000000000001',NULL,true::boolean,1,E'달리기 진짜 효과적이에요. 저도 퇴근 후 30분 조깅하고 나면 일 생각이 싹 없어져요.',21,0,false,NOW()-INTERVAL '2 hours'),
+('30000000-0000-0000-0000-000000000072','20000000-0000-0000-0000-000000000100','00000000-0000-0000-0000-000000000009',NULL,true::boolean,2,E'슬랙 알림 끄는 게 정말 중요한데 잘 안 되더라고요 ㅠ 용기 있는 선택이에요.',17,0,false,NOW()-INTERVAL '2 hours'),
+('30000000-0000-0000-0000-000000000073','20000000-0000-0000-0000-000000000100','00000000-0000-0000-0000-000000000033','30000000-0000-0000-0000-000000000071',true::boolean,3,E'조깅 후 샤워하면서 "오늘 업무 끝" 선언하는 의식을 만들어보세요. 저한테는 진짜 효과적이에요.',14,1,false,NOW()-INTERVAL '1 hours');
+
+COMMIT;
+
+-- =============================================================
+-- PART 6: VOTES
+-- =============================================================
+BEGIN;
+
+INSERT INTO votes (id, user_id, target_type, target_id, vote_type, created_at)
+VALUES
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000001','post','20000000-0000-0000-0000-000000000004','up',NOW()-INTERVAL '1 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000001','post','20000000-0000-0000-0000-000000000005','up',NOW()-INTERVAL '2 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000001','post','20000000-0000-0000-0000-000000000007','up',NOW()-INTERVAL '3 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000001','post','20000000-0000-0000-0000-000000000019','up',NOW()-INTERVAL '4 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000001','post','20000000-0000-0000-0000-000000000020','up',NOW()-INTERVAL '5 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000002','post','20000000-0000-0000-0000-000000000004','up',NOW()-INTERVAL '6 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000002','post','20000000-0000-0000-0000-000000000005','up',NOW()-INTERVAL '7 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000002','post','20000000-0000-0000-0000-000000000009','up',NOW()-INTERVAL '8 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000002','post','20000000-0000-0000-0000-000000000030','up',NOW()-INTERVAL '9 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000002','post','20000000-0000-0000-0000-000000000032','up',NOW()-INTERVAL '10 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000003','post','20000000-0000-0000-0000-000000000005','up',NOW()-INTERVAL '11 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000003','post','20000000-0000-0000-0000-000000000019','up',NOW()-INTERVAL '12 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000003','post','20000000-0000-0000-0000-000000000028','up',NOW()-INTERVAL '13 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000003','post','20000000-0000-0000-0000-000000000044','up',NOW()-INTERVAL '14 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000003','post','20000000-0000-0000-0000-000000000048','up',NOW()-INTERVAL '15 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000004','post','20000000-0000-0000-0000-000000000002','up',NOW()-INTERVAL '16 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000004','post','20000000-0000-0000-0000-000000000006','up',NOW()-INTERVAL '17 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000004','post','20000000-0000-0000-0000-000000000025','up',NOW()-INTERVAL '18 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000004','post','20000000-0000-0000-0000-000000000046','up',NOW()-INTERVAL '19 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000004','post','20000000-0000-0000-0000-000000000075','up',NOW()-INTERVAL '20 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000005','post','20000000-0000-0000-0000-000000000003','up',NOW()-INTERVAL '21 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000005','post','20000000-0000-0000-0000-000000000014','up',NOW()-INTERVAL '22 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000005','post','20000000-0000-0000-0000-000000000020','up',NOW()-INTERVAL '23 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000005','post','20000000-0000-0000-0000-000000000022','up',NOW()-INTERVAL '24 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000005','post','20000000-0000-0000-0000-000000000044','up',NOW()-INTERVAL '25 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000006','post','20000000-0000-0000-0000-000000000004','up',NOW()-INTERVAL '26 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000006','post','20000000-0000-0000-0000-000000000014','up',NOW()-INTERVAL '27 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000006','post','20000000-0000-0000-0000-000000000021','up',NOW()-INTERVAL '28 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000006','post','20000000-0000-0000-0000-000000000026','up',NOW()-INTERVAL '29 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000006','post','20000000-0000-0000-0000-000000000088','up',NOW()-INTERVAL '30 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000007','post','20000000-0000-0000-0000-000000000005','up',NOW()-INTERVAL '1 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000007','post','20000000-0000-0000-0000-000000000016','up',NOW()-INTERVAL '2 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000007','post','20000000-0000-0000-0000-000000000021','up',NOW()-INTERVAL '3 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000007','post','20000000-0000-0000-0000-000000000052','up',NOW()-INTERVAL '4 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000007','post','20000000-0000-0000-0000-000000000083','up',NOW()-INTERVAL '5 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000008','post','20000000-0000-0000-0000-000000000006','up',NOW()-INTERVAL '6 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000008','post','20000000-0000-0000-0000-000000000017','up',NOW()-INTERVAL '7 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000008','post','20000000-0000-0000-0000-000000000030','up',NOW()-INTERVAL '8 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000008','post','20000000-0000-0000-0000-000000000066','up',NOW()-INTERVAL '9 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000008','post','20000000-0000-0000-0000-000000000080','up',NOW()-INTERVAL '10 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000009','post','20000000-0000-0000-0000-000000000007','up',NOW()-INTERVAL '11 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000009','post','20000000-0000-0000-0000-000000000020','up',NOW()-INTERVAL '12 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000009','post','20000000-0000-0000-0000-000000000031','up',NOW()-INTERVAL '13 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000009','post','20000000-0000-0000-0000-000000000063','up',NOW()-INTERVAL '14 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000009','post','20000000-0000-0000-0000-000000000065','up',NOW()-INTERVAL '15 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000010','post','20000000-0000-0000-0000-000000000008','up',NOW()-INTERVAL '16 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000010','post','20000000-0000-0000-0000-000000000022','up',NOW()-INTERVAL '17 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000010','post','20000000-0000-0000-0000-000000000032','up',NOW()-INTERVAL '18 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000010','post','20000000-0000-0000-0000-000000000050','up',NOW()-INTERVAL '19 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000010','post','20000000-0000-0000-0000-000000000068','up',NOW()-INTERVAL '20 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000011','post','20000000-0000-0000-0000-000000000009','up',NOW()-INTERVAL '21 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000011','post','20000000-0000-0000-0000-000000000023','up',NOW()-INTERVAL '22 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000011','post','20000000-0000-0000-0000-000000000034','up',NOW()-INTERVAL '23 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000011','post','20000000-0000-0000-0000-000000000051','up',NOW()-INTERVAL '24 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000011','post','20000000-0000-0000-0000-000000000070','up',NOW()-INTERVAL '25 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000012','post','20000000-0000-0000-0000-000000000010','up',NOW()-INTERVAL '26 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000012','post','20000000-0000-0000-0000-000000000024','up',NOW()-INTERVAL '27 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000012','post','20000000-0000-0000-0000-000000000035','up',NOW()-INTERVAL '28 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000012','post','20000000-0000-0000-0000-000000000053','up',NOW()-INTERVAL '29 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000012','post','20000000-0000-0000-0000-000000000071','up',NOW()-INTERVAL '30 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000013','post','20000000-0000-0000-0000-000000000001','up',NOW()-INTERVAL '1 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000013','post','20000000-0000-0000-0000-000000000025','up',NOW()-INTERVAL '2 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000013','post','20000000-0000-0000-0000-000000000036','up',NOW()-INTERVAL '3 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000013','post','20000000-0000-0000-0000-000000000055','up',NOW()-INTERVAL '4 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000013','post','20000000-0000-0000-0000-000000000072','up',NOW()-INTERVAL '5 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000014','post','20000000-0000-0000-0000-000000000002','up',NOW()-INTERVAL '6 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000014','post','20000000-0000-0000-0000-000000000027','up',NOW()-INTERVAL '7 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000014','post','20000000-0000-0000-0000-000000000037','up',NOW()-INTERVAL '8 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000014','post','20000000-0000-0000-0000-000000000056','up',NOW()-INTERVAL '9 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000014','post','20000000-0000-0000-0000-000000000073','up',NOW()-INTERVAL '10 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000015','post','20000000-0000-0000-0000-000000000003','up',NOW()-INTERVAL '11 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000015','post','20000000-0000-0000-0000-000000000028','up',NOW()-INTERVAL '12 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000015','post','20000000-0000-0000-0000-000000000038','up',NOW()-INTERVAL '13 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000015','post','20000000-0000-0000-0000-000000000063','up',NOW()-INTERVAL '14 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000015','post','20000000-0000-0000-0000-000000000074','up',NOW()-INTERVAL '15 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000016','post','20000000-0000-0000-0000-000000000004','up',NOW()-INTERVAL '16 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000016','post','20000000-0000-0000-0000-000000000029','up',NOW()-INTERVAL '17 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000016','post','20000000-0000-0000-0000-000000000039','up',NOW()-INTERVAL '18 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000016','post','20000000-0000-0000-0000-000000000064','up',NOW()-INTERVAL '19 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000016','post','20000000-0000-0000-0000-000000000076','up',NOW()-INTERVAL '20 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000017','post','20000000-0000-0000-0000-000000000005','up',NOW()-INTERVAL '21 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000017','post','20000000-0000-0000-0000-000000000031','up',NOW()-INTERVAL '22 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000017','post','20000000-0000-0000-0000-000000000041','up',NOW()-INTERVAL '23 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000017','post','20000000-0000-0000-0000-000000000067','up',NOW()-INTERVAL '24 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000017','post','20000000-0000-0000-0000-000000000077','up',NOW()-INTERVAL '25 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000018','post','20000000-0000-0000-0000-000000000006','up',NOW()-INTERVAL '26 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000018','post','20000000-0000-0000-0000-000000000032','up',NOW()-INTERVAL '27 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000018','post','20000000-0000-0000-0000-000000000042','up',NOW()-INTERVAL '28 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000018','post','20000000-0000-0000-0000-000000000068','up',NOW()-INTERVAL '29 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000018','post','20000000-0000-0000-0000-000000000078','up',NOW()-INTERVAL '30 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000019','post','20000000-0000-0000-0000-000000000007','up',NOW()-INTERVAL '1 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000019','post','20000000-0000-0000-0000-000000000033','up',NOW()-INTERVAL '2 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000019','post','20000000-0000-0000-0000-000000000043','up',NOW()-INTERVAL '3 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000019','post','20000000-0000-0000-0000-000000000069','up',NOW()-INTERVAL '4 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000019','post','20000000-0000-0000-0000-000000000079','up',NOW()-INTERVAL '5 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000020','post','20000000-0000-0000-0000-000000000008','up',NOW()-INTERVAL '6 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000020','post','20000000-0000-0000-0000-000000000034','up',NOW()-INTERVAL '7 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000020','post','20000000-0000-0000-0000-000000000045','up',NOW()-INTERVAL '8 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000020','post','20000000-0000-0000-0000-000000000070','up',NOW()-INTERVAL '9 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000020','post','20000000-0000-0000-0000-000000000082','up',NOW()-INTERVAL '10 hours')
+ON CONFLICT DO NOTHING;
+
+COMMIT;
+
+-- =============================================================
+-- PART 7: REACTIONS
+-- =============================================================
+BEGIN;
+
+INSERT INTO reactions (id, user_id, post_id, comment_id, emoji, created_at)
+VALUES
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000003',NULL,'👍',NOW()-INTERVAL '1 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000003',NULL,'👍',NOW()-INTERVAL '2 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000003',NULL,'❤️',NOW()-INTERVAL '3 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000003',NULL,'👍',NOW()-INTERVAL '4 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000005','20000000-0000-0000-0000-000000000003',NULL,'👍',NOW()-INTERVAL '5 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000006','20000000-0000-0000-0000-000000000003',NULL,'😮',NOW()-INTERVAL '6 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000007','20000000-0000-0000-0000-000000000003',NULL,'👍',NOW()-INTERVAL '7 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000008','20000000-0000-0000-0000-000000000003',NULL,'❤️',NOW()-INTERVAL '8 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000009','20000000-0000-0000-0000-000000000003',NULL,'👍',NOW()-INTERVAL '9 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000010','20000000-0000-0000-0000-000000000003',NULL,'👍',NOW()-INTERVAL '10 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000026',NULL,'👍',NOW()-INTERVAL '11 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000026',NULL,'❤️',NOW()-INTERVAL '12 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000026',NULL,'👍',NOW()-INTERVAL '13 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000026',NULL,'😮',NOW()-INTERVAL '14 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000005','20000000-0000-0000-0000-000000000026',NULL,'👍',NOW()-INTERVAL '15 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000006','20000000-0000-0000-0000-000000000026',NULL,'👍',NOW()-INTERVAL '16 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000007','20000000-0000-0000-0000-000000000026',NULL,'😮',NOW()-INTERVAL '17 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000008','20000000-0000-0000-0000-000000000026',NULL,'👍',NOW()-INTERVAL '18 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000009','20000000-0000-0000-0000-000000000026',NULL,'❤️',NOW()-INTERVAL '19 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000010','20000000-0000-0000-0000-000000000026',NULL,'👍',NOW()-INTERVAL '20 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000011','20000000-0000-0000-0000-000000000026',NULL,'👍',NOW()-INTERVAL '21 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000012','20000000-0000-0000-0000-000000000026',NULL,'👍',NOW()-INTERVAL '22 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000013','20000000-0000-0000-0000-000000000026',NULL,'😮',NOW()-INTERVAL '23 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000014','20000000-0000-0000-0000-000000000026',NULL,'👍',NOW()-INTERVAL '24 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000015','20000000-0000-0000-0000-000000000026',NULL,'❤️',NOW()-INTERVAL '25 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000057',NULL,'❤️',NOW()-INTERVAL '26 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000057',NULL,'❤️',NOW()-INTERVAL '27 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000057',NULL,'😮',NOW()-INTERVAL '28 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000057',NULL,'❤️',NOW()-INTERVAL '29 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000005','20000000-0000-0000-0000-000000000057',NULL,'❤️',NOW()-INTERVAL '30 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000006','20000000-0000-0000-0000-000000000057',NULL,'❤️',NOW()-INTERVAL '31 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000007','20000000-0000-0000-0000-000000000057',NULL,'😂',NOW()-INTERVAL '32 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000008','20000000-0000-0000-0000-000000000057',NULL,'❤️',NOW()-INTERVAL '33 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000009','20000000-0000-0000-0000-000000000057',NULL,'❤️',NOW()-INTERVAL '34 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000010','20000000-0000-0000-0000-000000000057',NULL,'❤️',NOW()-INTERVAL '35 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000011','20000000-0000-0000-0000-000000000057',NULL,'❤️',NOW()-INTERVAL '36 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000012','20000000-0000-0000-0000-000000000057',NULL,'😮',NOW()-INTERVAL '37 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000013','20000000-0000-0000-0000-000000000057',NULL,'❤️',NOW()-INTERVAL '38 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000014','20000000-0000-0000-0000-000000000057',NULL,'❤️',NOW()-INTERVAL '39 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000015','20000000-0000-0000-0000-000000000057',NULL,'❤️',NOW()-INTERVAL '40 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000090',NULL,'❤️',NOW()-INTERVAL '41 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000090',NULL,'😢',NOW()-INTERVAL '42 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000090',NULL,'❤️',NOW()-INTERVAL '43 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000090',NULL,'😢',NOW()-INTERVAL '44 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000005','20000000-0000-0000-0000-000000000090',NULL,'❤️',NOW()-INTERVAL '45 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000006','20000000-0000-0000-0000-000000000090',NULL,'😢',NOW()-INTERVAL '46 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000007','20000000-0000-0000-0000-000000000090',NULL,'❤️',NOW()-INTERVAL '47 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000008','20000000-0000-0000-0000-000000000090',NULL,'😢',NOW()-INTERVAL '48 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000009','20000000-0000-0000-0000-000000000090',NULL,'❤️',NOW()-INTERVAL '1 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000010','20000000-0000-0000-0000-000000000090',NULL,'😢',NOW()-INTERVAL '2 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000093',NULL,'👍',NOW()-INTERVAL '3 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000093',NULL,'😮',NOW()-INTERVAL '4 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000093',NULL,'👍',NOW()-INTERVAL '5 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000093',NULL,'😮',NOW()-INTERVAL '6 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000005','20000000-0000-0000-0000-000000000093',NULL,'👍',NOW()-INTERVAL '7 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000006','20000000-0000-0000-0000-000000000093',NULL,'😮',NOW()-INTERVAL '8 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000007','20000000-0000-0000-0000-000000000093',NULL,'👍',NOW()-INTERVAL '9 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000008','20000000-0000-0000-0000-000000000093',NULL,'😮',NOW()-INTERVAL '10 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000009','20000000-0000-0000-0000-000000000093',NULL,'👍',NOW()-INTERVAL '11 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000010','20000000-0000-0000-0000-000000000093',NULL,'😮',NOW()-INTERVAL '12 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000097',NULL,'😢',NOW()-INTERVAL '13 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000097',NULL,'😢',NOW()-INTERVAL '14 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000097',NULL,'❤️',NOW()-INTERVAL '15 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000097',NULL,'😢',NOW()-INTERVAL '16 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000005','20000000-0000-0000-0000-000000000097',NULL,'😢',NOW()-INTERVAL '17 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000006','20000000-0000-0000-0000-000000000097',NULL,'😡',NOW()-INTERVAL '18 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000007','20000000-0000-0000-0000-000000000097',NULL,'😢',NOW()-INTERVAL '19 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000008','20000000-0000-0000-0000-000000000097',NULL,'❤️',NOW()-INTERVAL '20 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000009','20000000-0000-0000-0000-000000000097',NULL,'😢',NOW()-INTERVAL '21 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000010','20000000-0000-0000-0000-000000000097',NULL,'😢',NOW()-INTERVAL '22 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000004',NULL,'👍',NOW()-INTERVAL '23 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000004',NULL,'❤️',NOW()-INTERVAL '24 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000004',NULL,'👍',NOW()-INTERVAL '25 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000005',NULL,'👍',NOW()-INTERVAL '26 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000005','20000000-0000-0000-0000-000000000005',NULL,'😂',NOW()-INTERVAL '27 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000010',NULL,'❤️',NOW()-INTERVAL '28 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000010',NULL,'😢',NOW()-INTERVAL '29 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000012',NULL,'😡',NOW()-INTERVAL '30 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000012',NULL,'😢',NOW()-INTERVAL '31 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000005','20000000-0000-0000-0000-000000000014',NULL,'❤️',NOW()-INTERVAL '32 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000020',NULL,'👍',NOW()-INTERVAL '33 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000020',NULL,'😮',NOW()-INTERVAL '34 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000061',NULL,'👍',NOW()-INTERVAL '35 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000061',NULL,'😮',NOW()-INTERVAL '36 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000005','20000000-0000-0000-0000-000000000083',NULL,'👍',NOW()-INTERVAL '37 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000006','20000000-0000-0000-0000-000000000080',NULL,'👍',NOW()-INTERVAL '38 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000007','20000000-0000-0000-0000-000000000080',NULL,'😮',NOW()-INTERVAL '39 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000008','20000000-0000-0000-0000-000000000063',NULL,'👍',NOW()-INTERVAL '40 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000009','20000000-0000-0000-0000-000000000063',NULL,'❤️',NOW()-INTERVAL '41 hours'),
+(gen_random_uuid(),'00000000-0000-0000-0000-000000000010','20000000-0000-0000-0000-000000000030',NULL,'👍',NOW()-INTERVAL '42 hours')
+ON CONFLICT DO NOTHING;
+
+COMMIT;
+
+-- =============================================================
+-- PART 8: SAVES (bookmarks)
+-- =============================================================
+BEGIN;
+
+INSERT INTO saves (user_id, post_id, created_at)
+VALUES
+('00000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000002',NOW()-INTERVAL '1 hours'),
+('00000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000005',NOW()-INTERVAL '2 hours'),
+('00000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000019',NOW()-INTERVAL '3 hours'),
+('00000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000026',NOW()-INTERVAL '4 hours'),
+('00000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000061',NOW()-INTERVAL '5 hours'),
+('00000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000088',NOW()-INTERVAL '6 hours'),
+('00000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000003',NOW()-INTERVAL '7 hours'),
+('00000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000010',NOW()-INTERVAL '8 hours'),
+('00000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000020',NOW()-INTERVAL '9 hours'),
+('00000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000057',NOW()-INTERVAL '10 hours'),
+('00000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000093',NOW()-INTERVAL '11 hours'),
+('00000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000097',NOW()-INTERVAL '12 hours'),
+('00000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000005',NOW()-INTERVAL '13 hours'),
+('00000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000014',NOW()-INTERVAL '14 hours'),
+('00000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000026',NOW()-INTERVAL '15 hours'),
+('00000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000080',NOW()-INTERVAL '16 hours'),
+('00000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000083',NOW()-INTERVAL '17 hours'),
+('00000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000090',NOW()-INTERVAL '18 hours'),
+('00000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000003',NOW()-INTERVAL '19 hours'),
+('00000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000012',NOW()-INTERVAL '20 hours'),
+('00000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000026',NOW()-INTERVAL '1 hours'),
+('00000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000075',NOW()-INTERVAL '2 hours'),
+('00000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000088',NOW()-INTERVAL '3 hours'),
+('00000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000097',NOW()-INTERVAL '4 hours'),
+('00000000-0000-0000-0000-000000000005','20000000-0000-0000-0000-000000000020',NOW()-INTERVAL '5 hours'),
+('00000000-0000-0000-0000-000000000005','20000000-0000-0000-0000-000000000026',NOW()-INTERVAL '6 hours'),
+('00000000-0000-0000-0000-000000000005','20000000-0000-0000-0000-000000000057',NOW()-INTERVAL '7 hours'),
+('00000000-0000-0000-0000-000000000005','20000000-0000-0000-0000-000000000061',NOW()-INTERVAL '8 hours'),
+('00000000-0000-0000-0000-000000000005','20000000-0000-0000-0000-000000000093',NOW()-INTERVAL '9 hours'),
+('00000000-0000-0000-0000-000000000005','20000000-0000-0000-0000-000000000099',NOW()-INTERVAL '10 hours'),
+('00000000-0000-0000-0000-000000000006','20000000-0000-0000-0000-000000000004',NOW()-INTERVAL '11 hours'),
+('00000000-0000-0000-0000-000000000006','20000000-0000-0000-0000-000000000014',NOW()-INTERVAL '12 hours'),
+('00000000-0000-0000-0000-000000000006','20000000-0000-0000-0000-000000000026',NOW()-INTERVAL '13 hours'),
+('00000000-0000-0000-0000-000000000006','20000000-0000-0000-0000-000000000088',NOW()-INTERVAL '14 hours'),
+('00000000-0000-0000-0000-000000000006','20000000-0000-0000-0000-000000000089',NOW()-INTERVAL '15 hours'),
+('00000000-0000-0000-0000-000000000006','20000000-0000-0000-0000-000000000090',NOW()-INTERVAL '16 hours'),
+('00000000-0000-0000-0000-000000000007','20000000-0000-0000-0000-000000000005',NOW()-INTERVAL '17 hours'),
+('00000000-0000-0000-0000-000000000007','20000000-0000-0000-0000-000000000020',NOW()-INTERVAL '18 hours'),
+('00000000-0000-0000-0000-000000000007','20000000-0000-0000-0000-000000000080',NOW()-INTERVAL '19 hours'),
+('00000000-0000-0000-0000-000000000007','20000000-0000-0000-0000-000000000083',NOW()-INTERVAL '20 hours'),
+('00000000-0000-0000-0000-000000000007','20000000-0000-0000-0000-000000000084',NOW()-INTERVAL '1 hours'),
+('00000000-0000-0000-0000-000000000007','20000000-0000-0000-0000-000000000085',NOW()-INTERVAL '2 hours'),
+('00000000-0000-0000-0000-000000000008','20000000-0000-0000-0000-000000000003',NOW()-INTERVAL '3 hours'),
+('00000000-0000-0000-0000-000000000008','20000000-0000-0000-0000-000000000061',NOW()-INTERVAL '4 hours'),
+('00000000-0000-0000-0000-000000000008','20000000-0000-0000-0000-000000000066',NOW()-INTERVAL '5 hours'),
+('00000000-0000-0000-0000-000000000008','20000000-0000-0000-0000-000000000080',NOW()-INTERVAL '6 hours'),
+('00000000-0000-0000-0000-000000000008','20000000-0000-0000-0000-000000000093',NOW()-INTERVAL '7 hours'),
+('00000000-0000-0000-0000-000000000008','20000000-0000-0000-0000-000000000097',NOW()-INTERVAL '8 hours'),
+('00000000-0000-0000-0000-000000000009','20000000-0000-0000-0000-000000000007',NOW()-INTERVAL '9 hours'),
+('00000000-0000-0000-0000-000000000009','20000000-0000-0000-0000-000000000022',NOW()-INTERVAL '10 hours'),
+('00000000-0000-0000-0000-000000000009','20000000-0000-0000-0000-000000000026',NOW()-INTERVAL '11 hours'),
+('00000000-0000-0000-0000-000000000009','20000000-0000-0000-0000-000000000057',NOW()-INTERVAL '12 hours'),
+('00000000-0000-0000-0000-000000000009','20000000-0000-0000-0000-000000000063',NOW()-INTERVAL '13 hours'),
+('00000000-0000-0000-0000-000000000009','20000000-0000-0000-0000-000000000065',NOW()-INTERVAL '14 hours'),
+('00000000-0000-0000-0000-000000000010','20000000-0000-0000-0000-000000000018',NOW()-INTERVAL '15 hours'),
+('00000000-0000-0000-0000-000000000010','20000000-0000-0000-0000-000000000026',NOW()-INTERVAL '16 hours'),
+('00000000-0000-0000-0000-000000000010','20000000-0000-0000-0000-000000000050',NOW()-INTERVAL '17 hours'),
+('00000000-0000-0000-0000-000000000010','20000000-0000-0000-0000-000000000068',NOW()-INTERVAL '18 hours'),
+('00000000-0000-0000-0000-000000000010','20000000-0000-0000-0000-000000000069',NOW()-INTERVAL '19 hours'),
+('00000000-0000-0000-0000-000000000010','20000000-0000-0000-0000-000000000080',NOW()-INTERVAL '20 hours'),
+('00000000-0000-0000-0000-000000000011','20000000-0000-0000-0000-000000000019',NOW()-INTERVAL '1 hours'),
+('00000000-0000-0000-0000-000000000011','20000000-0000-0000-0000-000000000032',NOW()-INTERVAL '2 hours'),
+('00000000-0000-0000-0000-000000000011','20000000-0000-0000-0000-000000000034',NOW()-INTERVAL '3 hours'),
+('00000000-0000-0000-0000-000000000011','20000000-0000-0000-0000-000000000060',NOW()-INTERVAL '4 hours'),
+('00000000-0000-0000-0000-000000000011','20000000-0000-0000-0000-000000000061',NOW()-INTERVAL '5 hours'),
+('00000000-0000-0000-0000-000000000011','20000000-0000-0000-0000-000000000083',NOW()-INTERVAL '6 hours'),
+('00000000-0000-0000-0000-000000000012','20000000-0000-0000-0000-000000000011',NOW()-INTERVAL '7 hours'),
+('00000000-0000-0000-0000-000000000012','20000000-0000-0000-0000-000000000016',NOW()-INTERVAL '8 hours'),
+('00000000-0000-0000-0000-000000000012','20000000-0000-0000-0000-000000000037',NOW()-INTERVAL '9 hours'),
+('00000000-0000-0000-0000-000000000012','20000000-0000-0000-0000-000000000060',NOW()-INTERVAL '10 hours'),
+('00000000-0000-0000-0000-000000000012','20000000-0000-0000-0000-000000000061',NOW()-INTERVAL '11 hours'),
+('00000000-0000-0000-0000-000000000012','20000000-0000-0000-0000-000000000062',NOW()-INTERVAL '12 hours'),
+('00000000-0000-0000-0000-000000000013','20000000-0000-0000-0000-000000000002',NOW()-INTERVAL '13 hours'),
+('00000000-0000-0000-0000-000000000013','20000000-0000-0000-0000-000000000026',NOW()-INTERVAL '14 hours'),
+('00000000-0000-0000-0000-000000000013','20000000-0000-0000-0000-000000000052',NOW()-INTERVAL '15 hours'),
+('00000000-0000-0000-0000-000000000013','20000000-0000-0000-0000-000000000053',NOW()-INTERVAL '16 hours'),
+('00000000-0000-0000-0000-000000000013','20000000-0000-0000-0000-000000000080',NOW()-INTERVAL '17 hours'),
+('00000000-0000-0000-0000-000000000013','20000000-0000-0000-0000-000000000088',NOW()-INTERVAL '18 hours'),
+('00000000-0000-0000-0000-000000000014','20000000-0000-0000-0000-000000000015',NOW()-INTERVAL '19 hours'),
+('00000000-0000-0000-0000-000000000014','20000000-0000-0000-0000-000000000046',NOW()-INTERVAL '20 hours'),
+('00000000-0000-0000-0000-000000000014','20000000-0000-0000-0000-000000000047',NOW()-INTERVAL '1 hours'),
+('00000000-0000-0000-0000-000000000014','20000000-0000-0000-0000-000000000061',NOW()-INTERVAL '2 hours'),
+('00000000-0000-0000-0000-000000000014','20000000-0000-0000-0000-000000000062',NOW()-INTERVAL '3 hours'),
+('00000000-0000-0000-0000-000000000014','20000000-0000-0000-0000-000000000077',NOW()-INTERVAL '4 hours'),
+('00000000-0000-0000-0000-000000000015','20000000-0000-0000-0000-000000000014',NOW()-INTERVAL '5 hours'),
+('00000000-0000-0000-0000-000000000015','20000000-0000-0000-0000-000000000057',NOW()-INTERVAL '6 hours'),
+('00000000-0000-0000-0000-000000000015','20000000-0000-0000-0000-000000000076',NOW()-INTERVAL '7 hours'),
+('00000000-0000-0000-0000-000000000015','20000000-0000-0000-0000-000000000088',NOW()-INTERVAL '8 hours'),
+('00000000-0000-0000-0000-000000000015','20000000-0000-0000-0000-000000000089',NOW()-INTERVAL '9 hours'),
+('00000000-0000-0000-0000-000000000015','20000000-0000-0000-0000-000000000093',NOW()-INTERVAL '10 hours'),
+('00000000-0000-0000-0000-000000000016','20000000-0000-0000-0000-000000000019',NOW()-INTERVAL '11 hours'),
+('00000000-0000-0000-0000-000000000016','20000000-0000-0000-0000-000000000034',NOW()-INTERVAL '12 hours'),
+('00000000-0000-0000-0000-000000000016','20000000-0000-0000-0000-000000000060',NOW()-INTERVAL '13 hours'),
+('00000000-0000-0000-0000-000000000016','20000000-0000-0000-0000-000000000061',NOW()-INTERVAL '14 hours'),
+('00000000-0000-0000-0000-000000000016','20000000-0000-0000-0000-000000000078',NOW()-INTERVAL '15 hours'),
+('00000000-0000-0000-0000-000000000016','20000000-0000-0000-0000-000000000085',NOW()-INTERVAL '16 hours'),
+('00000000-0000-0000-0000-000000000017','20000000-0000-0000-0000-000000000010',NOW()-INTERVAL '17 hours'),
+('00000000-0000-0000-0000-000000000017','20000000-0000-0000-0000-000000000035',NOW()-INTERVAL '18 hours'),
+('00000000-0000-0000-0000-000000000017','20000000-0000-0000-0000-000000000061',NOW()-INTERVAL '19 hours'),
+('00000000-0000-0000-0000-000000000017','20000000-0000-0000-0000-000000000080',NOW()-INTERVAL '20 hours'),
+('00000000-0000-0000-0000-000000000017','20000000-0000-0000-0000-000000000086',NOW()-INTERVAL '1 hours'),
+('00000000-0000-0000-0000-000000000017','20000000-0000-0000-0000-000000000087',NOW()-INTERVAL '2 hours'),
+('00000000-0000-0000-0000-000000000018','20000000-0000-0000-0000-000000000003',NOW()-INTERVAL '3 hours'),
+('00000000-0000-0000-0000-000000000018','20000000-0000-0000-0000-000000000062',NOW()-INTERVAL '4 hours'),
+('00000000-0000-0000-0000-000000000018','20000000-0000-0000-0000-000000000068',NOW()-INTERVAL '5 hours'),
+('00000000-0000-0000-0000-000000000018','20000000-0000-0000-0000-000000000069',NOW()-INTERVAL '6 hours'),
+('00000000-0000-0000-0000-000000000018','20000000-0000-0000-0000-000000000080',NOW()-INTERVAL '7 hours'),
+('00000000-0000-0000-0000-000000000018','20000000-0000-0000-0000-000000000084',NOW()-INTERVAL '8 hours'),
+('00000000-0000-0000-0000-000000000019','20000000-0000-0000-0000-000000000005',NOW()-INTERVAL '9 hours'),
+('00000000-0000-0000-0000-000000000019','20000000-0000-0000-0000-000000000013',NOW()-INTERVAL '10 hours'),
+('00000000-0000-0000-0000-000000000019','20000000-0000-0000-0000-000000000019',NOW()-INTERVAL '11 hours'),
+('00000000-0000-0000-0000-000000000019','20000000-0000-0000-0000-000000000080',NOW()-INTERVAL '12 hours'),
+('00000000-0000-0000-0000-000000000019','20000000-0000-0000-0000-000000000083',NOW()-INTERVAL '13 hours'),
+('00000000-0000-0000-0000-000000000019','20000000-0000-0000-0000-000000000089',NOW()-INTERVAL '14 hours'),
+('00000000-0000-0000-0000-000000000020','20000000-0000-0000-0000-000000000026',NOW()-INTERVAL '15 hours'),
+('00000000-0000-0000-0000-000000000020','20000000-0000-0000-0000-000000000028',NOW()-INTERVAL '16 hours'),
+('00000000-0000-0000-0000-000000000020','20000000-0000-0000-0000-000000000038',NOW()-INTERVAL '17 hours'),
+('00000000-0000-0000-0000-000000000020','20000000-0000-0000-0000-000000000039',NOW()-INTERVAL '18 hours'),
+('00000000-0000-0000-0000-000000000020','20000000-0000-0000-0000-000000000061',NOW()-INTERVAL '19 hours'),
+('00000000-0000-0000-0000-000000000020','20000000-0000-0000-0000-000000000090',NOW()-INTERVAL '20 hours')
+ON CONFLICT DO NOTHING;
+
+COMMIT;
+
+-- =============================================================
+-- PART 9: POST TAGS (해시태그)
+-- =============================================================
+BEGIN;
+
+INSERT INTO post_tags (post_id, tag, created_at)
+VALUES
+('20000000-0000-0000-0000-000000000003','공지',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000003','복지',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000004','온보딩',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000004','문화',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000005','재택근무',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000005','생산성',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000006','CICD',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000006','DevOps',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000007','독서',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000008','복지',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000009','울산맛집',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000010','이직',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000010','커리어',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000011','연봉협상',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000012','직장생활',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000013','번아웃',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000014','육아휴직',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000015','전배',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000016','복지포인트',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000019','조선업',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000019','LNG',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000020','AI',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000020','ChatGPT',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000022','칭찬',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000025','아이디어',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000026','아이디어',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000028','HHI',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000028','수주',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000029','울산맛집',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000044','등산',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000046','독서모임',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000048','헬스',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000050','골프',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000052','게임',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000054','요리',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000055','맛집',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000056','소개팅',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000057','소개팅',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000058','소개팅매너',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000060','주식',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000060','HD현대',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000061','ETF',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000061','재테크',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000062','연금저축',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000063','울산맛집',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000065','직장문화',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000066','부동산',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000068','자동차',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000070','여행',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000072','중고거래',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000075','육아휴직',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000077','이직',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000078','커리어',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000080','재택근무',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000081','재택근무',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000082','화상회의',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000083','웹개발',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000084','TypeScript',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000085','Kubernetes',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000086','Notion',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000087','협업툴',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000088','신입사원',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000090','번아웃',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000091','직장생활',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000092','직장생활',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000093','연봉',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000094','연봉인상',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000095','복지포인트',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000096','리더십',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000097','상사',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000098','회식',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000099','워라밸',NOW()-INTERVAL '1 hour'),
+('20000000-0000-0000-0000-000000000100','워라밸',NOW()-INTERVAL '1 hour')
+ON CONFLICT DO NOTHING;
+
+COMMIT;
+
+-- =============================================================
+-- PART 10: CHANNEL MEMBERS
+-- =============================================================
+BEGIN;
+
+INSERT INTO channel_members (channel_id, user_id, role, joined_at)
+VALUES
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '1 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '2 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '3 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '4 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '5 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '6 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '7 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '8 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '9 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '10 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '11 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '12 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '13 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '14 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '15 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '16 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '17 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '18 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '19 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '20 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '21 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '22 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '23 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '24 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '25 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '26 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '27 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '28 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '29 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '30 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '31 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '32 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '33 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '34 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '35 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '36 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '37 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '38 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '39 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '40 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '41 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '42 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '43 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '44 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '45 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '46 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '47 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '48 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '49 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '50 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '51 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '52 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '53 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '54 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '55 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '56 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '57 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '58 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '59 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '60 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '1 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '2 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '3 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '4 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '5 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '6 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '7 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '8 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '9 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '10 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '11 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '12 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '13 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '14 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '15 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '16 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '17 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '18 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '19 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '20 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '21 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '22 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '23 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '24 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '25 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '26 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '27 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '28 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '29 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '30 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '31 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '32 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '33 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '34 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '35 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '36 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '37 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '38 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '39 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '40 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '41 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '42 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '43 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '44 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '45 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '46 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '47 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '48 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '49 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '50 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '51 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '52 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '53 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '54 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '55 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '56 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '57 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '58 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '59 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '60 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '1 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '2 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '3 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '4 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '5 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '6 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '7 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '8 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '9 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '10 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '11 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '12 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '13 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '14 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '15 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '16 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '17 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '18 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '19 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '20 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '21 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '22 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '23 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '24 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '25 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '26 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '27 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '28 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '29 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '30 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '31 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '32 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '33 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '34 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '35 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '36 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '37 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '38 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '39 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '40 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '41 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '42 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '43 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '44 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '45 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '46 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '47 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '48 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '49 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '50 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '51 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '52 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '53 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '54 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '55 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '56 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '57 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '58 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '59 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '60 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '1 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '2 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '3 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '4 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '5 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '6 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '7 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '8 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '9 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '10 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '11 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '12 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '13 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '14 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '15 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '16 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '17 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '18 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '19 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '20 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '21 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '22 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '23 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '24 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '25 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '26 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '27 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '28 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '29 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '30 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '31 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '32 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '33 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '34 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '35 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '36 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '37 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '38 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '39 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '40 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '41 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '42 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '43 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '44 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '45 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '46 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '47 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '48 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '49 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '50 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '51 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '52 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '53 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '54 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '55 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '56 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '57 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '58 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '59 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '60 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '1 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '2 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '3 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '4 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '5 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '6 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '7 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '8 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '9 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '10 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '11 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '12 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '13 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '14 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '15 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '16 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '17 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '18 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '19 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '20 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '21 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '22 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '23 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '24 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '25 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '26 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '27 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '28 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '29 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '30 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '31 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '32 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '33 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '34 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '35 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '36 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '37 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '38 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '39 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '40 days'),
+('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000039','admin',NOW()-INTERVAL '41 days'),
+('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000039','admin',NOW()-INTERVAL '42 days'),
+('10000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000039','admin',NOW()-INTERVAL '43 days'),
+('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000039','admin',NOW()-INTERVAL '44 days'),
+('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000039','admin',NOW()-INTERVAL '45 days'),
+('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000039','admin',NOW()-INTERVAL '46 days'),
+('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000039','admin',NOW()-INTERVAL '47 days'),
+('10000000-0000-0000-0000-000000000008','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '48 days'),
+('10000000-0000-0000-0000-000000000008','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '49 days'),
+('10000000-0000-0000-0000-000000000008','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '50 days'),
+('10000000-0000-0000-0000-000000000008','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '51 days'),
+('10000000-0000-0000-0000-000000000008','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '52 days'),
+('10000000-0000-0000-0000-000000000008','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '53 days'),
+('10000000-0000-0000-0000-000000000008','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '54 days'),
+('10000000-0000-0000-0000-000000000008','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '55 days'),
+('10000000-0000-0000-0000-000000000008','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '56 days'),
+('10000000-0000-0000-0000-000000000008','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '57 days'),
+('10000000-0000-0000-0000-000000000009','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '58 days'),
+('10000000-0000-0000-0000-000000000009','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '59 days'),
+('10000000-0000-0000-0000-000000000009','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '60 days'),
+('10000000-0000-0000-0000-000000000009','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '1 days'),
+('10000000-0000-0000-0000-000000000009','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '2 days'),
+('10000000-0000-0000-0000-000000000009','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '3 days'),
+('10000000-0000-0000-0000-000000000010','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '4 days'),
+('10000000-0000-0000-0000-000000000010','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '5 days'),
+('10000000-0000-0000-0000-000000000010','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '6 days'),
+('10000000-0000-0000-0000-000000000010','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '7 days'),
+('10000000-0000-0000-0000-000000000010','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '8 days'),
+('10000000-0000-0000-0000-000000000010','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '9 days'),
+('10000000-0000-0000-0000-000000000011','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '10 days'),
+('10000000-0000-0000-0000-000000000011','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '11 days'),
+('10000000-0000-0000-0000-000000000011','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '12 days'),
+('10000000-0000-0000-0000-000000000011','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '13 days'),
+('10000000-0000-0000-0000-000000000011','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '14 days'),
+('10000000-0000-0000-0000-000000000011','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '15 days'),
+('10000000-0000-0000-0000-000000000012','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '16 days'),
+('10000000-0000-0000-0000-000000000012','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '17 days'),
+('10000000-0000-0000-0000-000000000012','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '18 days'),
+('10000000-0000-0000-0000-000000000012','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '19 days'),
+('10000000-0000-0000-0000-000000000012','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '20 days'),
+('10000000-0000-0000-0000-000000000012','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '21 days'),
+('10000000-0000-0000-0000-000000000013','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '22 days'),
+('10000000-0000-0000-0000-000000000013','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '23 days'),
+('10000000-0000-0000-0000-000000000013','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '24 days'),
+('10000000-0000-0000-0000-000000000013','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '25 days'),
+('10000000-0000-0000-0000-000000000014','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '26 days'),
+('10000000-0000-0000-0000-000000000014','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '27 days'),
+('10000000-0000-0000-0000-000000000014','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '28 days'),
+('10000000-0000-0000-0000-000000000014','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '29 days'),
+('10000000-0000-0000-0000-000000000014','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '30 days'),
+('10000000-0000-0000-0000-000000000014','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '31 days'),
+('10000000-0000-0000-0000-000000000014','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '32 days'),
+('10000000-0000-0000-0000-000000000014','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '33 days'),
+('10000000-0000-0000-0000-000000000015','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '34 days'),
+('10000000-0000-0000-0000-000000000015','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '35 days'),
+('10000000-0000-0000-0000-000000000015','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '36 days'),
+('10000000-0000-0000-0000-000000000015','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '37 days'),
+('10000000-0000-0000-0000-000000000015','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '38 days'),
+('10000000-0000-0000-0000-000000000015','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '39 days'),
+('10000000-0000-0000-0000-000000000015','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '40 days'),
+('10000000-0000-0000-0000-000000000016','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '41 days'),
+('10000000-0000-0000-0000-000000000016','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '42 days'),
+('10000000-0000-0000-0000-000000000016','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '43 days'),
+('10000000-0000-0000-0000-000000000016','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '44 days'),
+('10000000-0000-0000-0000-000000000016','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '45 days'),
+('10000000-0000-0000-0000-000000000016','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '46 days'),
+('10000000-0000-0000-0000-000000000016','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '47 days'),
+('10000000-0000-0000-0000-000000000017','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '48 days'),
+('10000000-0000-0000-0000-000000000017','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '49 days'),
+('10000000-0000-0000-0000-000000000017','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '50 days'),
+('10000000-0000-0000-0000-000000000017','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '51 days'),
+('10000000-0000-0000-0000-000000000017','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '52 days'),
+('10000000-0000-0000-0000-000000000017','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '53 days'),
+('10000000-0000-0000-0000-000000000018','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '54 days'),
+('10000000-0000-0000-0000-000000000018','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '55 days'),
+('10000000-0000-0000-0000-000000000018','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '56 days'),
+('10000000-0000-0000-0000-000000000018','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '57 days'),
+('10000000-0000-0000-0000-000000000018','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '58 days'),
+('10000000-0000-0000-0000-000000000018','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '59 days'),
+('10000000-0000-0000-0000-000000000018','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '60 days'),
+('10000000-0000-0000-0000-000000000019','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '1 days'),
+('10000000-0000-0000-0000-000000000019','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '2 days'),
+('10000000-0000-0000-0000-000000000019','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '3 days'),
+('10000000-0000-0000-0000-000000000019','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '4 days'),
+('10000000-0000-0000-0000-000000000019','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '5 days'),
+('10000000-0000-0000-0000-000000000019','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '6 days'),
+('10000000-0000-0000-0000-000000000020','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '7 days'),
+('10000000-0000-0000-0000-000000000020','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '8 days'),
+('10000000-0000-0000-0000-000000000020','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '9 days'),
+('10000000-0000-0000-0000-000000000020','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '10 days'),
+('10000000-0000-0000-0000-000000000020','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '11 days'),
+('10000000-0000-0000-0000-000000000020','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '12 days'),
+('10000000-0000-0000-0000-000000000020','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '13 days'),
+('10000000-0000-0000-0000-000000000021','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '14 days'),
+('10000000-0000-0000-0000-000000000021','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '15 days'),
+('10000000-0000-0000-0000-000000000021','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '16 days'),
+('10000000-0000-0000-0000-000000000021','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '17 days'),
+('10000000-0000-0000-0000-000000000021','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '18 days'),
+('10000000-0000-0000-0000-000000000021','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '19 days'),
+('10000000-0000-0000-0000-000000000021','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '20 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '21 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '22 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '23 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '24 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '25 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '26 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '27 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '28 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '29 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '30 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '31 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '32 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '33 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '34 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '35 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '36 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '37 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '38 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '39 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '40 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '41 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '42 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '43 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '44 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '45 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '46 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '47 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '48 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '49 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '50 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '51 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '52 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '53 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '54 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '55 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '56 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '57 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '58 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '59 days'),
+('10000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '60 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '1 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '2 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '3 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '4 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '5 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '6 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '7 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '8 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '9 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '10 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '11 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '12 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '13 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '14 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '15 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '16 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '17 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '18 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '19 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '20 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '21 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '22 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '23 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '24 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '25 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '26 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '27 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '28 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '29 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '30 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '31 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '32 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '33 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '34 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '35 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '36 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '37 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '38 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '39 days'),
+('10000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '40 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '41 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '42 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '43 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '44 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '45 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '46 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '47 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '48 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '49 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '50 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '51 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '52 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '53 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '54 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '55 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '56 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '57 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '58 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '59 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '60 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '1 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '2 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '3 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '4 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '5 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '6 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '7 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '8 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '9 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '10 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '11 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '12 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '13 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '14 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '15 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '16 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '17 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '18 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '19 days'),
+('10000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '20 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '21 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '22 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '23 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '24 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '25 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '26 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '27 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '28 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '29 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '30 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '31 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '32 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '33 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '34 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '35 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '36 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '37 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '38 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '39 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '40 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '41 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '42 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '43 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '44 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '45 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '46 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '47 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '48 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '49 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '50 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '51 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '52 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '53 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '54 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '55 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '56 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '57 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '58 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '59 days'),
+('10000000-0000-0000-0000-000000000025','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '60 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '1 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '2 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '3 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '4 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '5 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '6 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '7 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '8 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '9 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '10 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '11 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '12 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '13 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '14 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '15 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '16 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '17 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '18 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '19 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '20 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '21 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '22 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '23 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '24 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '25 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '26 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '27 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '28 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '29 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '30 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '31 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '32 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '33 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '34 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '35 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '36 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '37 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '38 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '39 days'),
+('10000000-0000-0000-0000-000000000026','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '40 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '41 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '42 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '43 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '44 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '45 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '46 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '47 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '48 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '49 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '50 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '51 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '52 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '53 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '54 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '55 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '56 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '57 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '58 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '59 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '60 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '1 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '2 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '3 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '4 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '5 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '6 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '7 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '8 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '9 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '10 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '11 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '12 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '13 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '14 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '15 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '16 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '17 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '18 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '19 days'),
+('10000000-0000-0000-0000-000000000027','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '20 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '21 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '22 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '23 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '24 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '25 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '26 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '27 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '28 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '29 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '30 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '31 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '32 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '33 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '34 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '35 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '36 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '37 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '38 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '39 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '40 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '41 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '42 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '43 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '44 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '45 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '46 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '47 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '48 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '49 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '50 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '51 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '52 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '53 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '54 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '55 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '56 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '57 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '58 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '59 days'),
+('10000000-0000-0000-0000-000000000028','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '60 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '1 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '2 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '3 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '4 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '5 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '6 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '7 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '8 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '9 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '10 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '11 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '12 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '13 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '14 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '15 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '16 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '17 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '18 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '19 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '20 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '21 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '22 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '23 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '24 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '25 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '26 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '27 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '28 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '29 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '30 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '31 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '32 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '33 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '34 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '35 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '36 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '37 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '38 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '39 days'),
+('10000000-0000-0000-0000-000000000029','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '40 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '41 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '42 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '43 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '44 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '45 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '46 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '47 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '48 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '49 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '50 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '51 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '52 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '53 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '54 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '55 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '56 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '57 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '58 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '59 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '60 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '1 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '2 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '3 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '4 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '5 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '6 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '7 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '8 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '9 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '10 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '11 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '12 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '13 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '14 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '15 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '16 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '17 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '18 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '19 days'),
+('10000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '20 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '21 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '22 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '23 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '24 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '25 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '26 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '27 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '28 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '29 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '30 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '31 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '32 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '33 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '34 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '35 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '36 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '37 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '38 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '39 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '40 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '41 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '42 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '43 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '44 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '45 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '46 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '47 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '48 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '49 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '50 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '51 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '52 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '53 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '54 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '55 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '56 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '57 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '58 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '59 days'),
+('10000000-0000-0000-0000-000000000031','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '60 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '1 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '2 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '3 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '4 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '5 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '6 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '7 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '8 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '9 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '10 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '11 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '12 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '13 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '14 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '15 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '16 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '17 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '18 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '19 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '20 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '21 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '22 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '23 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '24 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '25 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '26 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '27 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '28 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '29 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '30 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '31 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '32 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '33 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '34 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '35 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '36 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '37 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '38 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '39 days'),
+('10000000-0000-0000-0000-000000000032','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '40 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '41 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '42 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '43 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '44 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '45 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '46 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '47 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '48 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '49 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '50 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '51 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '52 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '53 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '54 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '55 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '56 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '57 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '58 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '59 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '60 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '1 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '2 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '3 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '4 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '5 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '6 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '7 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '8 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '9 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '10 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '11 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '12 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '13 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '14 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '15 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '16 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '17 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '18 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '19 days'),
+('10000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '20 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '21 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '22 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '23 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '24 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '25 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '26 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '27 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '28 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '29 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '30 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '31 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '32 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '33 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '34 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '35 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '36 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '37 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '38 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '39 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '40 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '41 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '42 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '43 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '44 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '45 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '46 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '47 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '48 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '49 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '50 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '51 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '52 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '53 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '54 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '55 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '56 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '57 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '58 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '59 days'),
+('10000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '60 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '1 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '2 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '3 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '4 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '5 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '6 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '7 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '8 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '9 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '10 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '11 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '12 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '13 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '14 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '15 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '16 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '17 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '18 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '19 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '20 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '21 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '22 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '23 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '24 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '25 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '26 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '27 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '28 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '29 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '30 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '31 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '32 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '33 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '34 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '35 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '36 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '37 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '38 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '39 days'),
+('10000000-0000-0000-0000-000000000035','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '40 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '41 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '42 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '43 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '44 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '45 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '46 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '47 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '48 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '49 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '50 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '51 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '52 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '53 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '54 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '55 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '56 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '57 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '58 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '59 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '60 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '1 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '2 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '3 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '4 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '5 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '6 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '7 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '8 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '9 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '10 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '11 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '12 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '13 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '14 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '15 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '16 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '17 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '18 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '19 days'),
+('10000000-0000-0000-0000-000000000036','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '20 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '21 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '22 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '23 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '24 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '25 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '26 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '27 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '28 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '29 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '30 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '31 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '32 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '33 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '34 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '35 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '36 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '37 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '38 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '39 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '40 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '41 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '42 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '43 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '44 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '45 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '46 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '47 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '48 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '49 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '50 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '51 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '52 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '53 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '54 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '55 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '56 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '57 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '58 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '59 days'),
+('10000000-0000-0000-0000-000000000037','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '60 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000001','member',NOW()-INTERVAL '1 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000002','member',NOW()-INTERVAL '2 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000003','member',NOW()-INTERVAL '3 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000004','member',NOW()-INTERVAL '4 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000005','member',NOW()-INTERVAL '5 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000006','member',NOW()-INTERVAL '6 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000007','member',NOW()-INTERVAL '7 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000008','member',NOW()-INTERVAL '8 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000009','member',NOW()-INTERVAL '9 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000010','member',NOW()-INTERVAL '10 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000011','member',NOW()-INTERVAL '11 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000012','member',NOW()-INTERVAL '12 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000013','member',NOW()-INTERVAL '13 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000014','member',NOW()-INTERVAL '14 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000015','member',NOW()-INTERVAL '15 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000016','member',NOW()-INTERVAL '16 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000017','member',NOW()-INTERVAL '17 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000018','member',NOW()-INTERVAL '18 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000019','member',NOW()-INTERVAL '19 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000020','member',NOW()-INTERVAL '20 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000021','member',NOW()-INTERVAL '21 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000022','member',NOW()-INTERVAL '22 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000023','member',NOW()-INTERVAL '23 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000024','member',NOW()-INTERVAL '24 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000025','member',NOW()-INTERVAL '25 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000026','member',NOW()-INTERVAL '26 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000027','member',NOW()-INTERVAL '27 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000028','member',NOW()-INTERVAL '28 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000029','member',NOW()-INTERVAL '29 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000030','member',NOW()-INTERVAL '30 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000031','member',NOW()-INTERVAL '31 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000032','member',NOW()-INTERVAL '32 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000033','member',NOW()-INTERVAL '33 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000034','member',NOW()-INTERVAL '34 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000035','member',NOW()-INTERVAL '35 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000036','member',NOW()-INTERVAL '36 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000037','member',NOW()-INTERVAL '37 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000038','member',NOW()-INTERVAL '38 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000039','member',NOW()-INTERVAL '39 days'),
+('10000000-0000-0000-0000-000000000038','00000000-0000-0000-0000-000000000040','member',NOW()-INTERVAL '40 days')
+ON CONFLICT DO NOTHING;
+
+COMMIT;
+
+-- =============================================================
+-- PART 11: UPDATE COUNTERS
+-- =============================================================
+BEGIN;
+
+-- 채널별 post_count 업데이트
+UPDATE channels SET post_count = (
+  SELECT COUNT(*) FROM posts WHERE posts.channel_id = channels.id AND posts.is_deleted = false
+);
+
+-- 채널별 member_count 업데이트
+UPDATE channels SET member_count = (
+  SELECT COUNT(*) FROM channel_members WHERE channel_members.channel_id = channels.id
+);
+
+-- 포스트별 comment_count 업데이트
+UPDATE posts SET comment_count = (
+  SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.id AND comments.is_deleted = false
+);
+
+-- 포스트별 upvote_count 업데이트
+UPDATE posts SET upvote_count = (
+  SELECT COUNT(*) FROM votes WHERE votes.target_id = posts.id AND votes.target_type = 'post' AND votes.vote_type = 'up'
+) WHERE id IN (SELECT DISTINCT target_id FROM votes WHERE target_type = 'post');
+
+COMMIT;
+
+-- =============================================================
+-- 완료! 시드 데이터 삽입 완료
+-- 프로필 40명, 채널 38개, 게시글 100개, 댓글 73개
+-- =============================================================
