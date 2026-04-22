@@ -6,11 +6,18 @@ type DbInstance = ReturnType<typeof drizzle<typeof schema>>;
 
 let _db: DbInstance | undefined;
 
+export class MissingDatabaseUrlError extends Error {
+  constructor() {
+    super('DATABASE_URL environment variable is not set');
+    this.name = 'MissingDatabaseUrlError';
+  }
+}
+
 function getDb(): DbInstance {
   if (!_db) {
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) {
-      throw new Error('DATABASE_URL environment variable is not set');
+      throw new MissingDatabaseUrlError();
     }
     const client = postgres(connectionString, { prepare: false });
     _db = drizzle(client, { schema, logger: process.env.NODE_ENV === 'development' });

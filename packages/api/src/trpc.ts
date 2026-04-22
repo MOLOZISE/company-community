@@ -1,10 +1,21 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
-import { db, profiles } from '@repo/db';
+import { db, profiles, MissingDatabaseUrlError } from '@repo/db';
 import type { Context } from './context.js';
 
 const t = initTRPC.context<Context>().create();
 const DEFAULT_ADMIN_EMAILS = ['wchs0314@gmail.com'];
+
+function mapProcedureError(error: unknown): never {
+  if (error instanceof MissingDatabaseUrlError) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Database is not configured for this deployment. Please set DATABASE_URL.',
+    });
+  }
+
+  throw error instanceof Error ? error : new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+}
 
 function adminEmails() {
   const configured = process.env.ADMIN_EMAILS?.split(',').map((email) => email.trim().toLowerCase()).filter(Boolean) ?? [];
@@ -26,24 +37,34 @@ async function getProfile(userId: string) {
 }
 
 export const router = t.router;
-export const publicProcedure = t.procedure;
+export const publicProcedure = t.procedure.use(async (opts) => {
+  try {
+    return await opts.next();
+  } catch (error) {
+    mapProcedureError(error);
+  }
+});
 
 export const protectedProcedure = t.procedure.use(async (opts) => {
-  const { ctx } = opts;
+  try {
+    const { ctx } = opts;
 
-  if (!ctx.userId) {
-    throw new TRPCError({
-      code: 'UNAUTHORIZED',
-      message: 'You must be logged in to access this resource',
+    if (!ctx.userId) {
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'You must be logged in to access this resource',
+      });
+    }
+
+    return await opts.next({
+      ctx: {
+        ...ctx,
+        userId: ctx.userId,
+      },
     });
+  } catch (error) {
+    mapProcedureError(error);
   }
-
-  return opts.next({
-    ctx: {
-      ...ctx,
-      userId: ctx.userId,
-    },
-  });
 });
 
 export async function assertAdmin(userId: string, authEmail?: string | null) {
