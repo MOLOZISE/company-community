@@ -1,5 +1,6 @@
 'use client';
 
+// Shown on post detail only — not on feed cards
 import { trpc } from '@/lib/trpc';
 import { useAuthStore } from '@/store/auth';
 import { useRouter } from 'next/navigation';

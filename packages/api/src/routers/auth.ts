@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, protectedProcedure } from '../trpc.js';
 import { db, profiles, posts } from '@repo/db';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, ilike, or } from 'drizzle-orm';
 
 export const authRouter = router({
   /**
@@ -94,6 +94,26 @@ export const authRouter = router({
       totalUpvotes: row?.totalUpvotes ?? 0,
     };
   }),
+
+  /**
+   * Search public profiles by display name or department
+   */
+  search: publicProcedure
+    .input(z.object({ q: z.string().min(1).max(100) }))
+    .query(async ({ input }) => {
+      const term = `%${input.q}%`;
+      return db
+        .select({
+          id: profiles.id,
+          displayName: profiles.displayName,
+          department: profiles.department,
+          jobTitle: profiles.jobTitle,
+          avatarUrl: profiles.avatarUrl,
+        })
+        .from(profiles)
+        .where(or(ilike(profiles.displayName, term), ilike(profiles.department, term)))
+        .limit(10);
+    }),
 
   /**
    * Update current user's profile fields

@@ -1,13 +1,8 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { router, protectedProcedure } from '../trpc.js';
-import { db, reports, profiles } from '@repo/db';
+import { router, protectedProcedure, assertModerator } from '../trpc.js';
+import { db, reports } from '@repo/db';
 import { eq, and, desc } from 'drizzle-orm';
-
-async function assertVerified(userId: string) {
-  const [profile] = await db.select({ isVerified: profiles.isVerified }).from(profiles).where(eq(profiles.id, userId)).limit(1);
-  if (!profile?.isVerified) throw new TRPCError({ code: 'FORBIDDEN', message: 'Verified users only' });
-}
 
 export const reportsRouter = router({
   /**
@@ -51,12 +46,12 @@ export const reportsRouter = router({
     }),
 
   /**
-   * List all reports (admin: verified users only)
+   * List all reports (moderator or admin)
    */
   getList: protectedProcedure
     .input(z.object({ status: z.enum(['pending', 'resolved', 'dismissed']).optional(), limit: z.number().min(1).max(100).default(50) }))
     .query(async ({ ctx, input }) => {
-      await assertVerified(ctx.userId);
+      await assertModerator(ctx.userId);
 
       const rows = await db
         .select()
@@ -68,12 +63,12 @@ export const reportsRouter = router({
     }),
 
   /**
-   * Update report status (admin: verified users only)
+   * Update report status (moderator or admin)
    */
   updateStatus: protectedProcedure
     .input(z.object({ id: z.string(), status: z.enum(['pending', 'resolved', 'dismissed']) }))
     .mutation(async ({ ctx, input }) => {
-      await assertVerified(ctx.userId);
+      await assertModerator(ctx.userId);
       await db.update(reports).set({ status: input.status }).where(eq(reports.id, input.id));
       return { success: true };
     }),

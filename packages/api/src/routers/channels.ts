@@ -1,30 +1,8 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { router, publicProcedure, protectedProcedure } from '../trpc.js';
+import { router, publicProcedure, protectedProcedure, assertAdmin } from '../trpc.js';
 import { db, channels, channelMembers, channelRequests, profiles } from '@repo/db';
-import { eq, desc, and } from 'drizzle-orm';
-
-const DEFAULT_ADMIN_EMAILS = ['wchs0314@gmail.com'];
-
-function adminEmails() {
-  const configured = process.env.ADMIN_EMAILS?.split(',').map((email) => email.trim().toLowerCase()).filter(Boolean) ?? [];
-  return new Set([...DEFAULT_ADMIN_EMAILS, ...configured]);
-}
-
-async function assertAdmin(userId: string, authEmail?: string | null) {
-  const emailFromAuth = authEmail?.toLowerCase();
-  if (emailFromAuth && adminEmails().has(emailFromAuth)) return;
-
-  const [profile] = await db
-    .select({ email: profiles.email })
-    .from(profiles)
-    .where(eq(profiles.id, userId))
-    .limit(1);
-
-  if (!profile || !adminEmails().has(profile.email.toLowerCase())) {
-    throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin only' });
-  }
-}
+import { eq, desc, and, sql, ilike, or } from 'drizzle-orm';
 
 function normalizeSlug(value: string) {
   return value
@@ -280,10 +258,20 @@ export const channelsRouter = router({
   join: protectedProcedure
     .input(z.object({ channelId: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      await db
-        .insert(channelMembers)
-        .values({ channelId: input.channelId, userId: ctx.userId })
-        .onConflictDoNothing();
+      await db.transaction(async (tx) => {
+        const inserted = await tx
+          .insert(channelMembers)
+          .values({ channelId: input.channelId, userId: ctx.userId })
+          .onConflictDoNothing()
+          .returning({ channelId: channelMembers.channelId });
+
+        if (inserted.length > 0) {
+          await tx
+            .update(channels)
+            .set({ memberCount: sql`${channels.memberCount} + 1` })
+            .where(eq(channels.id, input.channelId));
+        }
+      });
       return { success: true };
     }),
 
@@ -293,14 +281,24 @@ export const channelsRouter = router({
   leave: protectedProcedure
     .input(z.object({ channelId: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      await db
-        .delete(channelMembers)
-        .where(
-          and(
-            eq(channelMembers.channelId, input.channelId),
-            eq(channelMembers.userId, ctx.userId)
+      await db.transaction(async (tx) => {
+        const deleted = await tx
+          .delete(channelMembers)
+          .where(
+            and(
+              eq(channelMembers.channelId, input.channelId),
+              eq(channelMembers.userId, ctx.userId)
+            )
           )
-        );
+          .returning({ channelId: channelMembers.channelId });
+
+        if (deleted.length > 0) {
+          await tx
+            .update(channels)
+            .set({ memberCount: sql`${channels.memberCount} - 1` })
+            .where(eq(channels.id, input.channelId));
+        }
+      });
       return { success: true };
     }),
 
@@ -314,4 +312,25 @@ export const channelsRouter = router({
       .where(eq(channelMembers.userId, ctx.userId));
     return memberships.map((m) => m.channelId);
   }),
+
+  /**
+   * Search channels by name or description
+   */
+  search: publicProcedure
+    .input(z.object({ q: z.string().min(1).max(100) }))
+    .query(async ({ input }) => {
+      const term = `%${input.q}%`;
+      return db
+        .select({
+          id: channels.id,
+          slug: channels.slug,
+          name: channels.name,
+          description: channels.description,
+          memberCount: channels.memberCount,
+        })
+        .from(channels)
+        .where(or(ilike(channels.name, term), ilike(channels.description, term)))
+        .orderBy(desc(channels.memberCount))
+        .limit(10);
+    }),
 });

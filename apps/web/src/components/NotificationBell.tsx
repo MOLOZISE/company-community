@@ -12,11 +12,16 @@ const TYPE_LABEL: Record<string, string> = {
   mention: '멘션',
 };
 
-function getTargetLink(targetType: string | null, targetId: string | null): string | null {
-  if (!targetId) return null;
-  if (targetType === 'post') return `/posts/${targetId}`;
-  if (targetType === 'comment') return null; // comment targetId alone can't nav without postId
-  return null;
+function getTargetLink(
+  postId: string | null,
+  targetType: string | null,
+  targetId: string | null
+): string {
+  if (postId) {
+    return targetType === 'comment' && targetId ? `/posts/${postId}#comment-${targetId}` : `/posts/${postId}`;
+  }
+  if (targetType === 'post' && targetId) return `/posts/${targetId}`;
+  return '/';
 }
 
 export function NotificationBell() {
@@ -55,11 +60,9 @@ export function NotificationBell() {
 
   function handleNotificationClick(n: (typeof items)[number]) {
     if (!n.isRead) markRead.mutate({ id: n.id });
-    const link = getTargetLink(n.targetType, n.targetId);
-    if (link) {
-      setOpen(false);
-      router.push(link);
-    }
+    const link = getTargetLink(n.postId, n.targetType, n.targetId);
+    setOpen(false);
+    router.push(link);
   }
 
   return (
@@ -98,7 +101,7 @@ export function NotificationBell() {
               <p className="text-sm text-slate-400 text-center py-8">알림이 없습니다</p>
             ) : (
               items.map((n) => {
-                const hasLink = !!getTargetLink(n.targetType, n.targetId);
+                const hasLink = true;
                 return (
                   <div
                     key={n.id}

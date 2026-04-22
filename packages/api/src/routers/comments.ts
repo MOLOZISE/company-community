@@ -125,6 +125,7 @@ export const commentsRouter = router({
           db.insert(notifications).values({
             recipientId: post.authorId,
             actorId: ctx.userId,
+            postId: input.postId,
             type: 'comment',
             targetType: 'post',
             targetId: input.postId,
@@ -139,6 +140,7 @@ export const commentsRouter = router({
           db.insert(notifications).values({
             recipientId: parentAuthorId,
             actorId: ctx.userId,
+            postId: input.postId,
             type: 'reply',
             targetType: 'comment',
             targetId: input.parentId,

@@ -125,47 +125,61 @@ export const postsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      let anonAlias: string | null = null;
-      if (input.isAnonymous) {
-        const postId = crypto.randomUUID();
-        const [profile] = await db
-          .select({ anonymousSeed: profiles.anonymousSeed })
-          .from(profiles)
-          .where(eq(profiles.id, ctx.userId))
-          .limit(1);
-        anonAlias = generateDeterministicAlias(profile?.anonymousSeed ?? postId, postId);
+      return db.transaction(async (tx) => {
+        let anonAlias: string | null = null;
+        if (input.isAnonymous) {
+          const postId = crypto.randomUUID();
+          const [profile] = await tx
+            .select({ anonymousSeed: profiles.anonymousSeed })
+            .from(profiles)
+            .where(eq(profiles.id, ctx.userId))
+            .limit(1);
+          anonAlias = generateDeterministicAlias(profile?.anonymousSeed ?? postId, postId);
 
-        const [post] = await db
+          const [post] = await tx
+            .insert(posts)
+            .values({
+              id: postId,
+              channelId: input.channelId,
+              authorId: ctx.userId,
+              title: input.title,
+              content: input.content,
+              isAnonymous: true,
+              anonAlias,
+              mediaUrls: input.mediaUrls,
+              flair: input.flair,
+            })
+            .returning();
+
+          await tx
+            .update(channels)
+            .set({ postCount: sql`${channels.postCount} + 1` })
+            .where(eq(channels.id, input.channelId));
+
+          return post;
+        }
+
+        const [post] = await tx
           .insert(posts)
           .values({
-            id: postId,
             channelId: input.channelId,
             authorId: ctx.userId,
             title: input.title,
             content: input.content,
-            isAnonymous: true,
-            anonAlias,
+            isAnonymous: false,
+            anonAlias: null,
             mediaUrls: input.mediaUrls,
             flair: input.flair,
           })
           .returning();
-        return post;
-      }
 
-      const [post] = await db
-        .insert(posts)
-        .values({
-          channelId: input.channelId,
-          authorId: ctx.userId,
-          title: input.title,
-          content: input.content,
-          isAnonymous: false,
-          anonAlias: null,
-          mediaUrls: input.mediaUrls,
-          flair: input.flair,
-        })
-        .returning();
-      return post;
+        await tx
+          .update(channels)
+          .set({ postCount: sql`${channels.postCount} + 1` })
+          .where(eq(channels.id, input.channelId));
+
+        return post;
+      });
     }),
 
   /**
@@ -174,18 +188,28 @@ export const postsRouter = router({
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const [post] = await db
-        .select({ authorId: posts.authorId })
-        .from(posts)
-        .where(eq(posts.id, input.id))
-        .limit(1);
+      await db.transaction(async (tx) => {
+        const [post] = await tx
+          .select({ authorId: posts.authorId, channelId: posts.channelId, isDeleted: posts.isDeleted })
+          .from(posts)
+          .where(eq(posts.id, input.id))
+          .limit(1);
 
-      if (!post) throw new TRPCError({ code: 'NOT_FOUND', message: 'Post not found' });
-      if (post.authorId !== ctx.userId) {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your post' });
-      }
+        if (!post) throw new TRPCError({ code: 'NOT_FOUND', message: 'Post not found' });
+        if (post.authorId !== ctx.userId) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your post' });
+        }
+        if (post.isDeleted) {
+          return;
+        }
 
-      await db.update(posts).set({ isDeleted: true }).where(eq(posts.id, input.id));
+        await tx.update(posts).set({ isDeleted: true }).where(eq(posts.id, input.id));
+
+        await tx
+          .update(channels)
+          .set({ postCount: sql`${channels.postCount} - 1` })
+          .where(eq(channels.id, post.channelId));
+      });
       return { success: true };
     }),
 
@@ -262,7 +286,7 @@ export const postsRouter = router({
 
       const [updated] = await db
         .update(posts)
-        .set({ title: input.title, content: input.content, flair: input.flair ?? null })
+        .set({ title: input.title, content: input.content, flair: input.flair ?? undefined })
         .where(eq(posts.id, input.id))
         .returning();
       return updated;

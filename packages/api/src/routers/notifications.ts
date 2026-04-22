@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc.js';
 import { db, notifications } from '@repo/db';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, count, getTableColumns } from 'drizzle-orm';
 
 export const notificationsRouter = router({
   /**
@@ -11,7 +11,7 @@ export const notificationsRouter = router({
     .input(z.object({ limit: z.number().min(1).max(50).default(20) }))
     .query(async ({ input, ctx }) => {
       return db
-        .select()
+        .select({ ...getTableColumns(notifications) })
         .from(notifications)
         .where(eq(notifications.recipientId, ctx.userId))
         .orderBy(desc(notifications.createdAt))
@@ -22,13 +22,11 @@ export const notificationsRouter = router({
    * Count of unread notifications
    */
   getUnreadCount: protectedProcedure.query(async ({ ctx }) => {
-    const rows = await db
-      .select()
+    const [result] = await db
+      .select({ count: count() })
       .from(notifications)
-      .where(
-        and(eq(notifications.recipientId, ctx.userId), eq(notifications.isRead, false))
-      );
-    return rows.length;
+      .where(and(eq(notifications.recipientId, ctx.userId), eq(notifications.isRead, false)));
+    return result?.count ?? 0;
   }),
 
   /**

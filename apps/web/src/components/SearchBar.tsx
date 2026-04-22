@@ -1,31 +1,54 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { trpc } from '@/lib/trpc';
 import { relativeTime } from '@/lib/time';
 
 export function SearchBar() {
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [focused, setFocused] = useState(false);
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const trimmedQuery = query.trim();
+  const trimmedDebouncedQuery = debouncedQuery.trim();
 
   const { data: results = [] } = trpc.posts.search.useQuery(
-    { q: query, limit: 5 },
-    { enabled: query.trim().length >= 2 }
+    { q: trimmedDebouncedQuery, limit: 5 },
+    { enabled: trimmedDebouncedQuery.length >= 2 }
   );
 
-  const showDropdown = focused && query.trim().length >= 2;
+  const showDropdown = focused && trimmedQuery.length >= 2;
 
-  function handleSelect(postId: string) {
-    setQuery('');
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  function handleSearch() {
+    if (!trimmedQuery) return;
     setFocused(false);
-    router.push(`/posts/${postId}`);
+    router.push(`/search?q=${encodeURIComponent(trimmedQuery)}`);
+  }
+
+  function handleChange(value: string) {
+    setQuery(value);
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedQuery(value);
+    }, 300);
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter' && results.length > 0) handleSelect(results[0].id);
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearch();
+    }
     if (e.key === 'Escape') {
       setFocused(false);
       inputRef.current?.blur();
@@ -42,11 +65,11 @@ export function SearchBar() {
           ref={inputRef}
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => handleChange(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setTimeout(() => setFocused(false), 150)}
           onKeyDown={handleKeyDown}
-          placeholder="게시글, 키워드 검색"
+          placeholder="Search posts, channels, users"
           className="w-32 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400 sm:w-56 md:w-72"
         />
       </div>
@@ -55,14 +78,18 @@ export function SearchBar() {
         <div className="absolute right-0 top-full z-50 mt-2 w-[min(360px,calc(100vw-1rem))] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
           {results.length === 0 ? (
             <div className="px-4 py-5 text-center">
-              <p className="text-sm font-medium text-slate-700">검색 결과가 없습니다</p>
-              <p className="mt-1 text-xs text-slate-400">다른 키워드로 다시 검색해보세요.</p>
+              <p className="text-sm font-medium text-slate-700">No results</p>
+              <p className="mt-1 text-xs text-slate-400">Try another search term</p>
             </div>
           ) : (
             results.map((post) => (
               <button
                 key={post.id}
-                onMouseDown={() => handleSelect(post.id)}
+                type="button"
+                onMouseDown={() => {
+                  setFocused(false);
+                  router.push(`/posts/${post.id}`);
+                }}
                 className="w-full border-b border-slate-50 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-slate-50"
               >
                 <div className="flex items-center gap-2 text-xs text-slate-400">

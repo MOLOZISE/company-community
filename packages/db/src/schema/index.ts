@@ -10,8 +10,10 @@ import {
   index,
   numeric,
   jsonb,
+  check,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 // ============================================
 // Profiles (extends Supabase Auth)
@@ -22,6 +24,7 @@ export const profiles = pgTable(
     id: uuid('id').primaryKey(),
     email: varchar('email', { length: 255 }).notNull().unique(),
     displayName: varchar('display_name', { length: 255 }).notNull(),
+    role: varchar('role', { length: 50 }).default('member'),
     department: varchar('department', { length: 255 }),
     jobTitle: varchar('job_title', { length: 255 }),
     avatarUrl: text('avatar_url'),
@@ -210,6 +213,14 @@ export const reactions = pgTable(
       userIdx: index('idx_reactions_user_id').on(table.userId),
       postIdx: index('idx_reactions_post_id').on(table.postId),
       commentIdx: index('idx_reactions_comment_id').on(table.commentId),
+      targetCheck: check(
+        'reactions_target_check',
+        sql`(
+          (${table.postId} IS NOT NULL AND ${table.commentId} IS NULL)
+          OR
+          (${table.postId} IS NULL AND ${table.commentId} IS NOT NULL)
+        )`
+      ),
     };
   }
 );
@@ -247,6 +258,7 @@ export const notifications = pgTable(
       .notNull()
       .references(() => profiles.id),
     actorId: uuid('actor_id').references(() => profiles.id),
+    postId: uuid('post_id').references(() => posts.id),
     type: varchar('type', { length: 50 }).notNull(),
     targetType: varchar('target_type', { length: 50 }),
     targetId: uuid('target_id'),

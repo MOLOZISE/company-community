@@ -14,23 +14,11 @@ interface PostCreateModalProps {
   onClose: () => void;
   onCreated: () => void;
   defaultChannelId?: string;
-  initialContent?: string;
 }
 
-const QUICK_TITLES = [
-  '동료들에게 질문이 있어요',
-  '업무 팁을 공유합니다',
-  '요즘 회사 생활 고민',
-];
-
-export function PostCreateModal({
-  onClose,
-  onCreated,
-  defaultChannelId,
-  initialContent = '',
-}: PostCreateModalProps) {
+export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCreateModalProps) {
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState(initialContent);
+  const [content, setContent] = useState('');
   const [channelId, setChannelId] = useState(defaultChannelId ?? '');
   const [flair, setFlair] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
@@ -38,6 +26,7 @@ export function PostCreateModal({
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [showOptional, setShowOptional] = useState(false);
 
   const { data: channelsData } = trpc.channels.getList.useQuery({ limit: 50, offset: 0 });
   const createPost = trpc.posts.create.useMutation();
@@ -50,7 +39,7 @@ export function PostCreateModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!channelId) {
-      setError('게시할 채널을 선택해주세요.');
+      setError('게시판을 선택해주세요.');
       return;
     }
     if (!content.trim()) {
@@ -89,22 +78,28 @@ export function PostCreateModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl"
+        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-4 shadow-xl sm:p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold text-slate-950">새 글 작성</h2>
-            <p className="mt-1 text-sm text-slate-500">질문, 공유, 고민을 동료들과 나눠보세요.</p>
+            <p className="mt-1 text-sm text-slate-500">질문, 공유, 고민을 편하게 적어보세요.</p>
           </div>
-          <button onClick={onClose} className="rounded-md px-2 py-1 text-sm text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="닫기">
+          <button
+            onClick={onClose}
+            className="rounded-md px-2 py-1 text-sm text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            aria-label="닫기"
+          >
             닫기
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">채널</label>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+              채널
+            </label>
             <select
               value={channelId}
               onChange={(e) => setChannelId(e.target.value)}
@@ -120,71 +115,25 @@ export function PostCreateModal({
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">글 유형</label>
-            <div className="flex flex-wrap gap-1.5">
-              {FLAIRS.map((f) => (
-                <button
-                  key={f.value}
-                  type="button"
-                  onClick={() => setFlair(flair === f.value ? '' : f.value)}
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
-                    flair === f.value
-                      ? f.color
-                      : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-1.5 flex items-center justify-between">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">제목</label>
-              <div className="hidden gap-1 sm:flex">
-                {QUICK_TITLES.map((quickTitle) => (
-                  <button
-                    key={quickTitle}
-                    type="button"
-                    onClick={() => setTitle(quickTitle)}
-                    className="rounded-full bg-slate-100 px-2 py-1 text-[11px] text-slate-500 hover:bg-slate-200"
-                  >
-                    {quickTitle}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value.slice(0, MAX_TITLE))}
-              placeholder="제목은 선택 사항입니다"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            {title.length > MAX_TITLE * 0.8 && (
-              <p className={`mt-0.5 text-right text-xs ${title.length >= MAX_TITLE ? 'text-red-400' : 'text-slate-400'}`}>
-                {title.length}/{MAX_TITLE}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">내용</label>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+              내용
+            </label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value.slice(0, MAX_CONTENT))}
               rows={7}
-              placeholder="상황, 궁금한 점, 원하는 조언을 편하게 적어주세요."
+              placeholder="상황, 궁금한 점, 의견을 편하게 적어주세요."
               required
               className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm leading-6 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <p className={`mt-0.5 text-right text-xs ${content.length > MAX_CONTENT * 0.9 ? 'text-red-400' : 'text-slate-400'}`}>
+            <p
+              className={`mt-0.5 text-right text-xs ${
+                content.length > MAX_CONTENT * 0.9 ? 'text-red-400' : 'text-slate-400'
+              }`}
+            >
               {content.length}/{MAX_CONTENT}
             </p>
           </div>
-
-          <ImageUpload onFile={handleFile} preview={imagePreview} />
 
           <label className="flex cursor-pointer items-start gap-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
             <input
@@ -196,10 +145,71 @@ export function PostCreateModal({
             <span>
               <span className="block font-medium text-slate-800">익명으로 게시</span>
               <span className="mt-0.5 block text-xs leading-5 text-slate-500">
-                프로필 대신 익명 별칭으로 표시됩니다.
+                프로필 대신 익명 별명으로 표시됩니다.
               </span>
             </span>
           </label>
+
+          <button
+            type="button"
+            onClick={() => setShowOptional((value) => !value)}
+            aria-expanded={showOptional}
+            className="w-full rounded-lg border border-dashed border-slate-300 px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            {showOptional ? '추가 옵션 ▲' : '추가 옵션 ▼'}
+          </button>
+
+          {showOptional && (
+            <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    제목
+                  </label>
+                </div>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value.slice(0, MAX_TITLE))}
+                  placeholder="제목은 선택 사항입니다."
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {title.length > MAX_TITLE * 0.8 && (
+                  <p
+                    className={`mt-0.5 text-right text-xs ${
+                      title.length >= MAX_TITLE ? 'text-red-400' : 'text-slate-400'
+                    }`}
+                  >
+                    {title.length}/{MAX_TITLE}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  글 유형
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {FLAIRS.map((f) => (
+                    <button
+                      key={f.value}
+                      type="button"
+                      onClick={() => setFlair(flair === f.value ? '' : f.value)}
+                      className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                        flair === f.value
+                          ? f.color
+                          : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <ImageUpload onFile={handleFile} preview={imagePreview} />
+            </div>
+          )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
