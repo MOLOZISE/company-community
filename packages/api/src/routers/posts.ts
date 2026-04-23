@@ -13,6 +13,13 @@ const postSelect = {
   channelSlug: channels.slug,
 };
 
+// Feed list only needs a short content preview — truncate at DB level to avoid
+// transferring up to 10,000 chars per post just to display 2-3 lines.
+const feedSelect = {
+  ...postSelect,
+  content: sql<string>`left(${posts.content}, 300)`,
+};
+
 const ANON_ANIMALS = [
   '강아지',
   '고양이',
@@ -107,7 +114,7 @@ export const postsRouter = router({
             : desc(posts.hotScore);
 
       const items = await db
-        .select(postSelect)
+        .select(feedSelect)
         .from(posts)
         .leftJoin(profiles, eq(posts.authorId, profiles.id))
         .leftJoin(channels, eq(posts.channelId, channels.id))
