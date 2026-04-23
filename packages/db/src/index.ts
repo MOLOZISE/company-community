@@ -19,7 +19,7 @@ function getDb(): DbInstance {
     if (!connectionString) {
       throw new MissingDatabaseUrlError();
     }
-    const client = postgres(connectionString, { prepare: false, max: 1 });
+    const client = postgres(connectionString, { prepare: false, max: 3 });
     _db = drizzle(client, { schema, logger: process.env.NODE_ENV === 'development' });
   }
   return _db;
