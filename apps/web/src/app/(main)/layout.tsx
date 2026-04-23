@@ -58,7 +58,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <Link href="/boards" className="font-bold text-slate-950 hover:text-blue-600">
+            <Link href="/home" className="font-bold text-slate-950 hover:text-blue-600">
               Company Community
             </Link>
           </div>

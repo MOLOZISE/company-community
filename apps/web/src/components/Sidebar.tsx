@@ -212,15 +212,10 @@ export function Sidebar({ onNavigate, onlineUserCount = 0 }: SidebarProps = {}) 
               </NavSection>
             )}
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-2">
-              <NavLink href="/feed" active={pathname === '/feed'} onClick={onNavigate} muted>
-                {UI_TEXT.feed}
-              </NavLink>
-              <div className="px-3 pb-1 pt-1 text-xs text-slate-400">
-                {UI_TEXT.onlinePrefix} {onlineUserCount.toLocaleString()}
-                {UI_TEXT.onlineSuffix}
-              </div>
-            </section>
+            <div className="px-3 py-1 text-xs text-slate-400">
+              {UI_TEXT.onlinePrefix} {onlineUserCount.toLocaleString()}
+              {UI_TEXT.onlineSuffix}
+            </div>
 
             <button
               onClick={() => setShowRequestModal(true)}
