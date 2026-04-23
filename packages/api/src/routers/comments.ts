@@ -24,13 +24,18 @@ export const commentsRouter = router({
         .where(and(eq(comments.postId, input.postId), eq(comments.isDeleted, false)))
         .orderBy(desc(comments.createdAt));
 
-      const topLevel = allComments.filter((c) => c.parentId === null);
-      const replies = allComments.filter((c) => c.parentId !== null);
+      const replyMap = new Map<string, typeof allComments>();
+      for (const c of allComments) {
+        if (c.parentId !== null) {
+          const bucket = replyMap.get(c.parentId) ?? [];
+          bucket.push(c);
+          replyMap.set(c.parentId, bucket);
+        }
+      }
 
-      return topLevel.map((parent) => ({
-        ...parent,
-        replies: replies.filter((r) => r.parentId === parent.id),
-      }));
+      return allComments
+        .filter((c) => c.parentId === null)
+        .map((parent) => ({ ...parent, replies: replyMap.get(parent.id) ?? [] }));
     }),
 
   /**

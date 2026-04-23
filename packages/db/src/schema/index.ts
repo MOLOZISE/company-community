@@ -154,6 +154,11 @@ export const posts = pgTable(
       authorIdIdx: index('idx_posts_author_id').on(table.authorId),
       createdAtIdx: index('idx_posts_created_at').on(table.createdAt),
       hotScoreIdx: index('idx_posts_hot_score').on(table.hotScore),
+      // Composite indexes for channel sidebar: latest/top post per channel subqueries
+      channelCreatedIdx: index('idx_posts_channel_created_at').on(table.channelId, table.isDeleted, table.createdAt),
+      channelHotScoreIdx: index('idx_posts_channel_hot_score').on(table.channelId, table.isDeleted, table.hotScore, table.createdAt),
+      // Composite index for getActiveChannels / getTrendingTopics 24h window
+      deletedCreatedIdx: index('idx_posts_deleted_created_at').on(table.isDeleted, table.createdAt),
     };
   }
 );
