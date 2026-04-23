@@ -8,13 +8,18 @@ import { useAuthStore } from '@/store/auth';
 import { Sidebar } from '@/components/Sidebar';
 import { NotificationBell } from '@/components/NotificationBell';
 import { SearchBar } from '@/components/SearchBar';
+import { RightSidebar } from '@/components/RightSidebar';
 import { usePresence } from '@/hooks/usePresence';
+import { trpc } from '@/lib/trpc';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, isLoading } = useAuthStore();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const onlineUserIds = usePresence(user?.id);
+  const { data: communityStats } = trpc.trending.getCommunityStats.useQuery();
+  const { data: trendingTopics } = trpc.trending.getTrendingTopics.useQuery();
+  const { data: activeChannels } = trpc.trending.getActiveChannels.useQuery();
 
   useEffect(() => {
     if (!isLoading && !user) router.replace('/login');
@@ -102,11 +107,12 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         </>
       )}
 
-      <div className="mx-auto flex max-w-6xl gap-6 px-4 py-6">
+      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 xl:grid-cols-[14rem_minmax(0,1fr)_18rem]">
         <div className="hidden md:block">
           <Sidebar onlineUserCount={onlineUserIds.length} />
         </div>
         <main className="min-w-0 flex-1">{children}</main>
+        <RightSidebar stats={communityStats} topics={trendingTopics} channels={activeChannels} />
       </div>
     </div>
   );

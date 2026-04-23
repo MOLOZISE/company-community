@@ -52,6 +52,7 @@ const BOARD_SECTION_ORDER: Array<{
 
 const BOARD_SECTION_KEYS: SidebarSectionKey[] = BOARD_SECTION_ORDER.map((section) => section.key);
 const BOARD_LIMIT = 3;
+const SPACE_LIMIT = 3;
 
 const UI_TEXT = {
   spacesSection: '\u{1F3AF} \uc18c\ubaa8\uc784',
@@ -98,6 +99,10 @@ export function Sidebar({ onNavigate, onlineUserCount = 0 }: SidebarProps = {}) 
     lifestyle: false,
     career: false,
     anonymous: false,
+  });
+  const [showAllSpaces, setShowAllSpaces] = useState({
+    joined: false,
+    discoverable: false,
   });
 
   const boardGroups = useMemo(() => {
@@ -154,6 +159,8 @@ export function Sidebar({ onNavigate, onlineUserCount = 0 }: SidebarProps = {}) 
 
   const mySpaces = spaces.filter((space) => myChannelIds?.includes(space.id));
   const otherSpaces = spaces.filter((space) => !myChannelIds?.includes(space.id));
+  const visibleMySpaces = showAllSpaces.joined ? mySpaces : mySpaces.slice(0, SPACE_LIMIT);
+  const visibleOtherSpaces = showAllSpaces.discoverable ? otherSpaces : otherSpaces.slice(0, SPACE_LIMIT);
 
   function boardPath(slug: string) {
     return `/boards/${slug}`;
@@ -166,6 +173,22 @@ export function Sidebar({ onNavigate, onlineUserCount = 0 }: SidebarProps = {}) 
   function handleShowAll(key: SidebarSectionKey) {
     setShowAllBoards((current) => ({ ...current, [key]: true }));
   }
+
+  function handleShowAllSpaces(key: 'joined' | 'discoverable') {
+    setShowAllSpaces((current) => ({ ...current, [key]: true }));
+  }
+
+  const activeJoinedSpaceIndex = mySpaces.findIndex((space) => isChannelRouteActive(pathname, spacePath(space.slug)));
+  const activeDiscoverableSpaceIndex = otherSpaces.findIndex((space) => isChannelRouteActive(pathname, spacePath(space.slug)));
+
+  useEffect(() => {
+    if (activeJoinedSpaceIndex >= SPACE_LIMIT) {
+      setShowAllSpaces((current) => (current.joined ? current : { ...current, joined: true }));
+    }
+    if (activeDiscoverableSpaceIndex >= SPACE_LIMIT) {
+      setShowAllSpaces((current) => (current.discoverable ? current : { ...current, discoverable: true }));
+    }
+  }, [activeDiscoverableSpaceIndex, activeJoinedSpaceIndex]);
 
   return (
     <aside className="w-56 shrink-0">
@@ -226,7 +249,11 @@ export function Sidebar({ onNavigate, onlineUserCount = 0 }: SidebarProps = {}) 
             {UI_TEXT.spacesAll}
           </NavLink>
 
-          {mySpaces.map((space) => (
+          <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            참여 중
+          </div>
+
+          {visibleMySpaces.map((space) => (
             <NavLink
               key={space.id}
               href={spacePath(space.slug)}
@@ -239,7 +266,23 @@ export function Sidebar({ onNavigate, onlineUserCount = 0 }: SidebarProps = {}) 
             </NavLink>
           ))}
 
-          {otherSpaces.slice(0, 3).map((space) => (
+          {!showAllSpaces.joined && mySpaces.length > SPACE_LIMIT && (
+            <button
+              type="button"
+              onClick={() => handleShowAllSpaces('joined')}
+              className="mx-2 mt-1 rounded-md border border-dashed border-slate-200 px-3 py-2 text-left text-xs font-medium text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+            >
+              {UI_TEXT.morePrefix}
+              {mySpaces.length - SPACE_LIMIT}
+              {UI_TEXT.moreSuffix}
+            </button>
+          )}
+
+          <div className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            참여 가능
+          </div>
+
+          {visibleOtherSpaces.map((space) => (
             <NavLink
               key={space.id}
               href={spacePath(space.slug)}
@@ -251,6 +294,18 @@ export function Sidebar({ onNavigate, onlineUserCount = 0 }: SidebarProps = {}) 
               {space.name}
             </NavLink>
           ))}
+
+          {!showAllSpaces.discoverable && otherSpaces.length > SPACE_LIMIT && (
+            <button
+              type="button"
+              onClick={() => handleShowAllSpaces('discoverable')}
+              className="mx-2 mt-1 rounded-md border border-dashed border-slate-200 px-3 py-2 text-left text-xs font-medium text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+            >
+              {UI_TEXT.morePrefix}
+              {otherSpaces.length - SPACE_LIMIT}
+              {UI_TEXT.moreSuffix}
+            </button>
+          )}
         </NavSection>
 
         {isAdmin && (

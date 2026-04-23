@@ -4,11 +4,11 @@ import { useEffect } from 'react';
 import { trpc } from '@/lib/trpc';
 import { supabase } from '@/lib/supabase';
 
-export function useRealtimeNotifications(userId: string | null | undefined) {
+export function useRealtimeNotifications(userId: string | null | undefined, enabled = true) {
   const utils = trpc.useContext();
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !enabled) return;
 
     const channel = supabase
       .channel(`notifications:${userId}`)
@@ -26,5 +26,5 @@ export function useRealtimeNotifications(userId: string | null | undefined) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, utils.notifications]);
+  }, [enabled, userId, utils.notifications]);
 }

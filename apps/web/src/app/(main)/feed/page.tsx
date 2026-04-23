@@ -5,9 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { InfinitePostList } from '@/components/InfinitePostList';
 import { PostCreateModal } from '@/components/PostCreateModal';
 import { FlairChips } from '@/components/FlairChips';
-import { CommunityStatsCard } from '@/components/CommunityStatsCard';
-import { TrendingTopicsCard } from '@/components/TrendingTopicsCard';
-import { ActiveChannelsCard } from '@/components/ActiveChannelsCard';
 import { OnboardingCard } from '@/components/OnboardingCard';
 import { trpc } from '@/lib/trpc';
 import { useAuthStore } from '@/store/auth';
@@ -31,10 +28,6 @@ export default function FeedPage() {
   });
   const join = trpc.channels.join.useMutation({ onSuccess: () => refetchMemberships() });
   const leave = trpc.channels.leave.useMutation({ onSuccess: () => refetchMemberships() });
-
-  const { data: communityStats } = trpc.trending.getCommunityStats.useQuery();
-  const { data: trendingTopics } = trpc.trending.getTrendingTopics.useQuery();
-  const { data: activeChannels } = trpc.trending.getActiveChannels.useQuery();
 
   const activeChannel = useMemo(
     () => channelsData?.items.find((channel) => channel.id === channelId),
@@ -62,23 +55,8 @@ export default function FeedPage() {
     router.push(query ? `/feed?${query}` : '/feed');
   }
 
-  const sidebar = (
-    <aside className="hidden xl:block xl:w-80 xl:shrink-0">
-      <div className="sticky top-6 space-y-4">
-        <CommunityStatsCard stats={communityStats} />
-        <TrendingTopicsCard topics={trendingTopics} />
-        <ActiveChannelsCard channels={activeChannels} />
-      </div>
-    </aside>
-  );
-
   function FeedShell({ children }: { children: React.ReactNode }) {
-    return (
-      <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-6">
-        <div className="min-w-0 space-y-5">{children}</div>
-        {sidebar}
-      </div>
-    );
+    return <div className="space-y-5">{children}</div>;
   }
 
   if (!activeChannel && !channelId) {
