@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { trpc } from '@/lib/trpc';
 import { ActiveChannelsCard } from './ActiveChannelsCard';
 import { CommunityStatsCard } from './CommunityStatsCard';
@@ -22,14 +23,20 @@ interface RightSidebarProps {
 }
 
 export function RightSidebar({ stats, topics, channels }: RightSidebarProps) {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    setReady(true);
+  }, []);
+
   const { data: liveStats } = trpc.trending.getCommunityStats.useQuery(undefined, {
-    enabled: stats === undefined,
+    enabled: ready && stats === undefined,
   });
   const { data: liveTopics } = trpc.trending.getTrendingTopics.useQuery(undefined, {
-    enabled: topics === undefined,
+    enabled: ready && topics === undefined,
   });
   const { data: liveChannels } = trpc.trending.getActiveChannels.useQuery(undefined, {
-    enabled: channels === undefined,
+    enabled: ready && channels === undefined,
   });
 
   const finalStats = stats ?? liveStats;
