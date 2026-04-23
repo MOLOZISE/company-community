@@ -32,11 +32,11 @@ function insertComment(tree: TopComment[], next: RealtimeComment): TopComment[] 
   });
 }
 
-export function useRealtimeComments(postId: string | null | undefined) {
+export function useRealtimeComments(postId: string | null | undefined, enabled = true) {
   const utils = trpc.useContext();
 
   useEffect(() => {
-    if (!postId) return;
+    if (!postId || !enabled) return;
 
     const channel = supabase
       .channel(`post:${postId}:comments`)
@@ -64,5 +64,5 @@ export function useRealtimeComments(postId: string | null | undefined) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [postId, utils.comments.getByPost]);
+  }, [enabled, postId, utils.comments.getByPost]);
 }
