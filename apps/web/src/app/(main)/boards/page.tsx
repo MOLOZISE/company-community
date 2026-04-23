@@ -9,31 +9,26 @@ import {
   BOARD_SECTION_ORDER,
   BOARD_SECTION_TABS,
   type BoardSectionKey,
-  formatChannelHighlight,
   getBoardSectionConfig,
   getBoardSectionHref,
   normalizeBoardSection,
 } from '@/lib/channel-groups';
-import { BOARD_LIST_QUERY } from '@/lib/channel-directory';
 
 type BoardItem = {
   id: string;
   slug: string;
   name: string;
   description: string | null;
-  type?: string | null;
   memberCount: number | null;
   postCount: number | null;
   purpose?: string | null;
   defaultSort?: string | null;
   sidebarSection?: string | null;
-  latestPostTitle?: string | null;
-  topPostTitle?: string | null;
 };
 
 const PURPOSE_LABELS: Record<string, string> = {
   discussion: '토론',
-  knowledge: '정보',
+  knowledge: '지식',
   announcement: '공지',
   social: '소통',
 };
@@ -49,8 +44,8 @@ export default function BoardsPage() {
   const searchParams = useSearchParams();
   const sectionParam = searchParams.get('section');
 
-  const { data: channelsData, isLoading } = trpc.channels.getList.useQuery(BOARD_LIST_QUERY);
-  const boards = ((channelsData?.items ?? []) as BoardItem[]).filter((channel) => channel.type !== 'space');
+  const { data: channelsData, isLoading } = trpc.channels.getHomeBoards.useQuery(undefined);
+  const boards = (channelsData?.items ?? []) as BoardItem[];
 
   const activeSection = useMemo<'all' | BoardSectionKey>(() => {
     if (!sectionParam || sectionParam === 'all') return 'all';
@@ -74,16 +69,16 @@ export default function BoardsPage() {
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
               <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/60">Boards</p>
-              <h1 className="mt-2 text-3xl font-bold tracking-tight">커뮤니티 게시판</h1>
+              <h1 className="mt-2 text-3xl font-bold tracking-tight">게시판 전체</h1>
               <p className="mt-3 text-sm leading-6 text-white/75">
-                주제별 게시판을 빠르게 훑고, 각 공간에서 지금 가장 뜨거운 글을 먼저 확인하세요.
+                주제별 게시판을 빠르게 훑고, 각 게시판에서 글을 확인해보세요.
               </p>
             </div>
             <button
               onClick={() => setShowModal(true)}
               className="shrink-0 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-blue-50"
             >
-              글 작성
+              글 쓰기
             </button>
           </div>
         </div>
@@ -138,7 +133,7 @@ export default function BoardsPage() {
                 prefetch={false}
                 className="rounded-full border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
               >
-                전체로
+                전체
               </Link>
             </div>
           )}
@@ -151,7 +146,7 @@ export default function BoardsPage() {
         </section>
       ) : (
         <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-400">
-          아직 게시판이 없습니다. 관리자에게 개설을 요청해보세요.
+          아직 게시판이 없어요. 관리자에게 새 게시판 개설을 요청해보세요.
         </div>
       )}
 
@@ -163,7 +158,6 @@ export default function BoardsPage() {
 function BoardCard({ board }: { board: BoardItem }) {
   const section = normalizeBoardSection(board.sidebarSection);
   const sectionConfig = section ? getBoardSectionConfig(section) : null;
-  const highlight = getBoardHighlight(board);
 
   return (
     <Link
@@ -196,10 +190,8 @@ function BoardCard({ board }: { board: BoardItem }) {
           </h3>
 
           <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-500">
-            {board.description ?? sectionConfig?.description ?? '게시판 설명이 없습니다.'}
+            {board.description ?? sectionConfig?.description ?? '게시판 소개가 아직 없어요.'}
           </p>
-
-          <p className="mt-3 text-sm font-medium text-slate-800">{highlight}</p>
         </div>
 
         <div className="flex shrink-0 flex-row gap-2 md:flex-col md:items-end md:gap-1">
@@ -218,18 +210,4 @@ function StatChip({ label, value }: { label: string; value: number }) {
       <span className="font-semibold text-slate-900">{value.toLocaleString()}</span>
     </div>
   );
-}
-
-function getBoardHighlight(board: BoardItem) {
-  const preferred =
-    board.defaultSort === 'hot'
-      ? board.topPostTitle ?? board.latestPostTitle
-      : board.latestPostTitle ?? board.topPostTitle;
-
-  if (preferred) {
-    return `${board.defaultSort === 'hot' ? '핫한 글' : '최근 글'} · ${formatChannelHighlight(preferred)}`;
-  }
-
-  const fallback = board.description ?? '지금은 올라온 글이 없어요.';
-  return `게시판 소개 · ${formatChannelHighlight(fallback)}`;
 }

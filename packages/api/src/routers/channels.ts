@@ -107,6 +107,37 @@ export const channelsRouter = router({
   }),
 
   /**
+   * Lightweight directory list for sidebars and overview pages.
+   * Includes both boards and spaces but skips per-channel post title subqueries.
+   */
+  getDirectory: publicProcedure.query(async () => {
+    const items = await db
+      .select({
+        id: channels.id,
+        slug: channels.slug,
+        name: channels.name,
+        description: channels.description,
+        iconUrl: channels.iconUrl,
+        memberCount: channels.memberCount,
+        postCount: channels.postCount,
+        type: channels.type,
+        scope: channels.scope,
+        sidebarSection: channels.sidebarSection,
+        postingMode: channels.postingMode,
+        membershipType: channels.membershipType,
+        isListed: channels.isListed,
+        defaultSort: channels.defaultSort,
+        purpose: channels.purpose,
+        displayOrder: channels.displayOrder,
+        parentId: channels.parentId,
+      })
+      .from(channels)
+      .orderBy(asc(channels.displayOrder), desc(channels.memberCount));
+
+    return { items, hasMore: false };
+  }),
+
+  /**
    * Get single channel by id
    */
   getById: publicProcedure

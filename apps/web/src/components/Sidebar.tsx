@@ -15,7 +15,6 @@ import {
   getSpaceFilterHref,
   normalizeBoardSection,
 } from '@/lib/channel-groups';
-import { CHANNEL_LIST_QUERY } from '@/lib/channel-directory';
 import { ChannelRequestModal } from './ChannelRequestModal';
 import { useAuthStore } from '@/store/auth';
 
@@ -29,6 +28,7 @@ type ChannelItem = {
   slug: string;
   name: string;
   description: string | null;
+  iconUrl: string | null;
   type: string | null;
   purpose: string | null;
   postingMode: string | null;
@@ -38,8 +38,6 @@ type ChannelItem = {
   sidebarSection: string | null;
   memberCount: number | null;
   postCount: number | null;
-  latestPostTitle?: string | null;
-  topPostTitle?: string | null;
 };
 
 type SectionTone = 'default' | 'slate' | 'blue' | 'orange' | 'green' | 'purple';
@@ -74,7 +72,7 @@ export function Sidebar({ onNavigate, onlineUserCount = 0 }: SidebarProps = {}) 
   const [loadDirectory, setLoadDirectory] = useState(false);
   const { user } = useAuthStore();
 
-  const { data: channelsData } = trpc.channels.getList.useQuery(CHANNEL_LIST_QUERY, {
+  const { data: channelsData } = trpc.channels.getDirectory.useQuery(undefined, {
     enabled: loadDirectory,
   });
   const { data: myChannelIds, refetch: refetchMemberships } = trpc.channels.getMyMemberships.useQuery(
@@ -556,13 +554,7 @@ function isChannelRouteActive(pathname: string | null, href: string) {
 }
 
 function getChannelHighlight(channel: ChannelItem) {
-  const preferred =
-    channel.defaultSort === 'hot'
-      ? channel.topPostTitle ?? channel.latestPostTitle
-      : channel.latestPostTitle ?? channel.topPostTitle;
-
   const label = channel.defaultSort === 'hot' ? '핫한 글' : '최근 글';
   const fallback = channel.description ?? getBoardSectionConfig(normalizeBoardSection(channel.sidebarSection) ?? 'company').description;
-  const value = formatChannelHighlight(preferred ?? fallback);
-  return `${label} · ${value}`;
+  return `${label} · ${formatChannelHighlight(fallback)}`;
 }
