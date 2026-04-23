@@ -1,10 +1,8 @@
 'use client';
 
 import { use, useState, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
 import { InfinitePostList } from '@/components/InfinitePostList';
 import { PostCreateModal } from '@/components/PostCreateModal';
-import { FlairChips } from '@/components/FlairChips';
 import { trpc } from '@/lib/trpc';
 
 const POSTING_MODE_LABELS: Record<string, string> = {
@@ -15,23 +13,14 @@ const POSTING_MODE_LABELS: Record<string, string> = {
 
 export default function BoardDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ flair?: string }>;
 }) {
   const { slug } = use(params);
-  const { flair: activeFlair } = use(searchParams);
-  const router = useRouter();
   const [showModal, setShowModal] = useState(false);
   const [feedKey, setFeedKey] = useState(0);
 
   const { data: channel, isLoading, error } = trpc.channels.getBySlug.useQuery({ slug });
-
-  function handleFlairChange(flair: string | undefined) {
-    const url = flair ? `/boards/${slug}?flair=${flair}` : `/boards/${slug}`;
-    router.push(url);
-  }
 
   function BoardShell({ children }: { children: ReactNode }) {
     return (
@@ -90,12 +79,9 @@ export default function BoardDetailPage({
         </div>
       </section>
 
-      <FlairChips activeFlair={activeFlair} onChange={handleFlairChange} />
-
       <InfinitePostList
         key={feedKey}
         channelId={channel.id}
-        flair={activeFlair}
         onStartPost={() => setShowModal(true)}
       />
 

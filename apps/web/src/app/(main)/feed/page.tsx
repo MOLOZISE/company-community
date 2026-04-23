@@ -1,10 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { InfinitePostList } from '@/components/InfinitePostList';
 import { PostCreateModal } from '@/components/PostCreateModal';
-import { FlairChips } from '@/components/FlairChips';
 import { OnboardingCard } from '@/components/OnboardingCard';
 import { trpc } from '@/lib/trpc';
 import { useAuthStore } from '@/store/auth';
@@ -12,10 +11,8 @@ import { usePresence } from '@/hooks/usePresence';
 import { CHANNEL_LIST_QUERY } from '@/lib/channel-directory';
 
 export default function FeedPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const channelId = searchParams.get('channel') ?? undefined;
-  const activeFlair = searchParams.get('flair') ?? undefined;
   const [showModal, setShowModal] = useState(false);
   const [feedKey, setFeedKey] = useState(0);
   const { user } = useAuthStore();
@@ -42,17 +39,6 @@ export default function FeedPage() {
 
   function handleCreated() {
     setFeedKey((key) => key + 1);
-  }
-
-  function handleFlairChange(flair: string | undefined) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (flair) {
-      params.set('flair', flair);
-    } else {
-      params.delete('flair');
-    }
-    const query = params.toString();
-    router.push(query ? `/feed?${query}` : '/feed');
   }
 
   function FeedShell({ children }: { children: React.ReactNode }) {
@@ -83,11 +69,7 @@ export default function FeedPage() {
           </div>
         </section>
 
-        <section className="rounded-[var(--cc-radius-card)] border border-slate-200 bg-white p-4 shadow-[var(--cc-shadow-soft)]">
-          <FlairChips activeFlair={activeFlair} onChange={handleFlairChange} />
-        </section>
-
-        <InfinitePostList key={feedKey} flair={activeFlair} onStartPost={() => setShowModal(true)} />
+        <InfinitePostList key={feedKey} onStartPost={() => setShowModal(true)} />
 
         {showModal && <PostCreateModal onClose={() => setShowModal(false)} onCreated={handleCreated} />}
       </FeedShell>
@@ -143,14 +125,9 @@ export default function FeedPage() {
           </div>
         </section>
 
-        <section className="rounded-[var(--cc-radius-card)] border border-slate-200 bg-white p-4 shadow-[var(--cc-shadow-soft)]">
-          <FlairChips activeFlair={activeFlair} onChange={handleFlairChange} />
-        </section>
-
         <InfinitePostList
           key={feedKey}
           channelId={channelId}
-          flair={activeFlair}
           onStartPost={() => setShowModal(true)}
         />
 
@@ -196,14 +173,9 @@ export default function FeedPage() {
         </div>
       </section>
 
-      <section className="rounded-[var(--cc-radius-card)] border border-slate-200 bg-white p-4 shadow-[var(--cc-shadow-soft)]">
-        <FlairChips activeFlair={activeFlair} onChange={handleFlairChange} />
-      </section>
-
       <InfinitePostList
         key={feedKey}
         channelId={channelId}
-        flair={activeFlair}
         onStartPost={() => setShowModal(true)}
       />
 

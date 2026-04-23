@@ -10,7 +10,6 @@ import type { inferRouterOutputs } from '@trpc/server';
 
 type RouterOutput = inferRouterOutputs<AppRouter>;
 type FeedPost = RouterOutput['posts']['getFeed']['items'][number];
-type SortOption = 'hot' | 'new' | 'top';
 
 interface InfinitePostListProps {
   channelId?: string;
@@ -21,13 +20,6 @@ interface InfinitePostListProps {
 
 const LIMIT = 10;
 const MAX_OFFSET = 1000;
-
-const SORT_LABELS: Record<SortOption, { label: string; hint: string }> = {
-  hot: { label: '인기', hint: '반응이 빠르게 모이는 글' },
-  new: { label: '최신', hint: '방금 올라온 글' },
-  top: { label: '상위', hint: '추천이 많이 받은 글' },
-};
-
 const STARTERS = [
   '요즘 본인 업무에서 가장 유용한 팁이 있나요?',
   '사무실 문화나 협업에서 재미있었던 순간을 공유해 주세요.',
@@ -35,7 +27,7 @@ const STARTERS = [
 ];
 
 export function InfinitePostList({ channelId, flair, tag, onStartPost }: InfinitePostListProps) {
-  const [sort, setSort] = useState<SortOption>('hot');
+  const sort = 'hot' as const;
   const [offset, setOffset] = useState(0);
   const [allPosts, setAllPosts] = useState<FeedPost[]>([]);
   const [hasMore, setHasMore] = useState(true);
@@ -79,7 +71,7 @@ export function InfinitePostList({ channelId, flair, tag, onStartPost }: Infinit
     setOffset(0);
     setAllPosts([]);
     setHasMore(true);
-  }, [sort, channelId, flair, tag]);
+  }, [channelId, flair, tag]);
 
   const loadMore = useCallback(() => {
     if (!isFetching && !isError && hasMore && offset + LIMIT < MAX_OFFSET) {
@@ -116,28 +108,6 @@ export function InfinitePostList({ channelId, flair, tag, onStartPost }: Infinit
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">글 목록</p>
-          <p className="mt-1 text-sm text-slate-500">{SORT_LABELS[sort].hint}</p>
-        </div>
-        <div className="flex gap-2">
-          {(['hot', 'new', 'top'] as SortOption[]).map((s) => (
-            <button
-              key={s}
-              onClick={() => setSort(s)}
-              className={`rounded-full px-3 py-1.5 text-sm font-medium ring-1 transition-colors ${
-                sort === s
-                  ? 'bg-blue-600 text-white ring-blue-600'
-                  : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              {SORT_LABELS[s].label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="space-y-3">
         {allPosts.map((post) => (
           <PostCard key={post.id} post={post} onDeleted={handleDeleted} isSaved={savedMap[post.id] ?? false} />

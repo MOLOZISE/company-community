@@ -2,10 +2,8 @@
 
 import { useState } from 'react';
 import { use } from 'react';
-import { useRouter } from 'next/navigation';
 import { InfinitePostList } from '@/components/InfinitePostList';
 import { PostCreateModal } from '@/components/PostCreateModal';
-import { FlairChips } from '@/components/FlairChips';
 import { trpc } from '@/lib/trpc';
 import { useAuthStore } from '@/store/auth';
 
@@ -17,14 +15,10 @@ const MEMBERSHIP_LABELS: Record<string, string> = {
 
 export default function SpaceDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ flair?: string }>;
 }) {
   const { slug } = use(params);
-  const { flair: activeFlair } = use(searchParams);
-  const router = useRouter();
   const [showModal, setShowModal] = useState(false);
   const [feedKey, setFeedKey] = useState(0);
   const { user } = useAuthStore();
@@ -37,11 +31,6 @@ export default function SpaceDetailPage({
   const leave = trpc.channels.leave.useMutation({ onSuccess: () => refetchMemberships() });
 
   const isMember = channel ? myChannelIds?.includes(channel.id) : false;
-
-  function handleFlairChange(flair: string | undefined) {
-    const url = flair ? `/spaces/${slug}?flair=${flair}` : `/spaces/${slug}`;
-    router.push(url);
-  }
 
   if (isLoading) {
     return (
@@ -110,14 +99,9 @@ export default function SpaceDetailPage({
         </div>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
-        <FlairChips activeFlair={activeFlair} onChange={handleFlairChange} />
-      </section>
-
       <InfinitePostList
         key={feedKey}
         channelId={channel.id}
-        flair={activeFlair}
         onStartPost={() => setShowModal(true)}
       />
 

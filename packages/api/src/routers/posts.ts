@@ -200,49 +200,34 @@ export const postsRouter = router({
       }
 
       return db.transaction(async (tx) => {
+        const [channel] = await tx
+          .select({ id: channels.id, postingMode: channels.postingMode })
+          .from(channels)
+          .where(eq(channels.id, input.channelId))
+          .limit(1);
+
+        if (!channel) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Channel not found' });
+        }
+
+        if (channel.postingMode === 'real_only' && input.isAnonymous) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: '이 게시판은 실명으로만 작성할 수 있어요.',
+          });
+        }
+
+        const effectiveIsAnonymous =
+          channel.postingMode === 'anonymous_only' ? true : input.isAnonymous;
+
         let anonAlias: string | null = null;
-        if (input.isAnonymous) {
+        if (effectiveIsAnonymous) {
           const [profile] = await tx
             .select({ anonymousSeed: profiles.anonymousSeed })
             .from(profiles)
             .where(eq(profiles.id, ctx.userId))
             .limit(1);
           anonAlias = generateDeterministicAlias(profile?.anonymousSeed ?? postId, postId);
-
-          const [post] = await tx
-            .insert(posts)
-            .values({
-              id: postId,
-              channelId: input.channelId,
-              authorId: ctx.userId,
-              title: input.title,
-              content: input.content,
-              kind,
-              isAnonymous: true,
-              anonAlias,
-              mediaUrls: input.mediaUrls,
-              flair: input.flair,
-            })
-            .returning();
-
-          await syncPostTags(tx, postId, input.content);
-
-          if (kind === 'poll') {
-            await tx.insert(pollOptions).values(
-              pollLabels.map((label, index) => ({
-                postId,
-                label,
-                orderIdx: index,
-              }))
-            );
-          }
-
-          await tx
-            .update(channels)
-            .set({ postCount: sql`${channels.postCount} + 1` })
-            .where(eq(channels.id, input.channelId));
-
-          return post;
         }
 
         const [post] = await tx
@@ -254,8 +239,8 @@ export const postsRouter = router({
             title: input.title,
             content: input.content,
             kind,
-            isAnonymous: false,
-            anonAlias: null,
+            isAnonymous: effectiveIsAnonymous,
+            anonAlias,
             mediaUrls: input.mediaUrls,
             flair: input.flair,
           })

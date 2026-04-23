@@ -1,8 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { trpc } from '@/lib/trpc';
-import { ImageUpload } from './ImageUpload';
 import { uploadPostImage } from '@/lib/storage';
 import { toast } from '@/store/toast';
 import { FLAIRS } from '@/lib/flair';
@@ -11,6 +10,9 @@ import { CHANNEL_LIST_QUERY } from '@/lib/channel-directory';
 const MAX_TITLE = 300;
 const MAX_CONTENT = 10000;
 const MAX_POLL_OPTIONS = 5;
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+
+type PostingMode = 'real_only' | 'anonymous_allowed' | 'anonymous_only';
 
 interface PostCreateModalProps {
   onClose: () => void;
@@ -19,6 +21,7 @@ interface PostCreateModalProps {
 }
 
 export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCreateModalProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [kind, setKind] = useState<'text' | 'poll'>('text');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -30,16 +33,64 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [isDraggingImage, setIsDraggingImage] = useState(false);
   const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
 
   const { data: channelsData } = trpc.channels.getList.useQuery(CHANNEL_LIST_QUERY);
   const createPost = trpc.posts.create.useMutation();
 
+  const selectedChannel = useMemo(
+    () => channelsData?.items.find((channel) => channel.id === channelId) ?? null,
+    [channelsData, channelId]
+  );
+
+  const postingMode = selectedChannel?.postingMode as PostingMode | undefined;
   const visiblePollOptions = useMemo(() => pollOptions.slice(0, MAX_POLL_OPTIONS), [pollOptions]);
+  const canToggleAnonymous = postingMode === 'anonymous_allowed' || postingMode == null;
+  const isAnonymousForced = postingMode === 'anonymous_only';
+  const isRealNameOnly = postingMode === 'real_only';
+
+  useEffect(() => {
+    if (isRealNameOnly) {
+      setIsAnonymous(false);
+    }
+    if (isAnonymousForced) {
+      setIsAnonymous(true);
+    }
+  }, [isAnonymousForced, isRealNameOnly]);
+
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
 
   function handleFile(file: File | null) {
+    if (!file) {
+      setImageFile(null);
+      setImagePreview(null);
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setError('이미지만 첨부할 수 있어요.');
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_SIZE) {
+      setError('이미지는 10MB 이하만 첨부할 수 있어요.');
+      return;
+    }
+
+    setError('');
     setImageFile(file);
-    setImagePreview(file ? URL.createObjectURL(file) : null);
+    setImagePreview(URL.createObjectURL(file));
+  }
+
+  function openFilePicker() {
+    fileInputRef.current?.click();
   }
 
   function switchKind(nextKind: 'text' | 'poll') {
@@ -48,6 +99,7 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
     if (nextKind === 'poll') {
       setImageFile(null);
       setImagePreview(null);
+      setIsDraggingImage(false);
       setPollOptions((current) => {
         const next = [...current];
         while (next.length < 2) next.push('');
@@ -86,14 +138,14 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
     }
 
     const normalizedPollOptions =
-      kind === 'poll'
-        ? pollOptions.map((option) => option.trim()).filter(Boolean)
-        : [];
+      kind === 'poll' ? pollOptions.map((option) => option.trim()).filter(Boolean) : [];
 
     if (kind === 'poll' && (normalizedPollOptions.length < 2 || normalizedPollOptions.length > 5)) {
-      setError('투표 옵션은 최소 2개, 최대 5개까지 입력할 수 있어요.');
+      setError('투표 옵션은 최소 2개, 최대 5개까지 입력해주세요.');
       return;
     }
+
+    const effectiveIsAnonymous = isAnonymousForced ? true : isRealNameOnly ? false : isAnonymous;
 
     setError('');
     setUploading(true);
@@ -111,12 +163,12 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
         content: content.trim(),
         kind,
         pollOptions: kind === 'poll' ? normalizedPollOptions : undefined,
-        isAnonymous,
+        isAnonymous: effectiveIsAnonymous,
         mediaUrls,
         flair: flair || undefined,
       });
 
-      toast.success('게시글을 작성했어요.');
+      toast.success('게시글이 작성됐어요.');
       onCreated();
       onClose();
     } catch (err) {
@@ -129,29 +181,29 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-4 shadow-xl sm:p-6"
+        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-black/5 sm:p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold text-slate-950">게시글 작성</h2>
-            <p className="mt-1 text-sm text-slate-500">일반 글 또는 투표 게시글을 작성할 수 있어요.</p>
+            <p className="mt-1 text-sm text-slate-500">텍스트, 투표, 익명 게시를 한 번에 설정할 수 있어요.</p>
           </div>
           <button
             onClick={onClose}
             className="rounded-md px-2 py-1 text-sm text-slate-400 hover:bg-slate-100 hover:text-slate-600"
             aria-label="닫기"
           >
-            닫기
+            ×
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
+          <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
             <button
               type="button"
               onClick={() => switchKind('text')}
-              className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+              className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
                 kind === 'text' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'
               }`}
             >
@@ -160,11 +212,11 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
             <button
               type="button"
               onClick={() => switchKind('poll')}
-              className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+              className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
                 kind === 'poll' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'
               }`}
             >
-              투표 게시글 만들기
+              투표 글
             </button>
           </div>
 
@@ -175,25 +227,32 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
             <select
               value={channelId}
               onChange={(e) => setChannelId(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">게시판 선택</option>
-              {channelsData?.items.map((ch) => (
-                <option key={ch.id} value={ch.id}>
-                  {ch.name}
+              <option value="">게시판을 선택하세요</option>
+              {channelsData?.items.map((channel) => (
+                <option key={channel.id} value={channel.id}>
+                  {channel.name}
                 </option>
               ))}
             </select>
+            {postingMode && (
+              <p className="mt-1.5 text-xs text-slate-500">
+                현재 규칙: {postingMode === 'real_only' ? '실명 전용' : postingMode === 'anonymous_only' ? '익명 전용' : '익명 선택 가능'}
+              </p>
+            )}
           </div>
 
           {kind === 'poll' && (
-            <div className="space-y-3 rounded-lg border border-blue-100 bg-blue-50/60 p-4">
+            <div className="space-y-3 rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-slate-900">투표 옵션</p>
                   <p className="mt-0.5 text-xs text-slate-500">최소 2개, 최대 5개까지 입력할 수 있어요.</p>
                 </div>
-                <span className="text-xs text-slate-400">{visiblePollOptions.length}/{MAX_POLL_OPTIONS}</span>
+                <span className="text-xs text-slate-400">
+                  {visiblePollOptions.length}/{MAX_POLL_OPTIONS}
+                </span>
               </div>
 
               <div className="space-y-2">
@@ -204,13 +263,13 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
                       value={option}
                       onChange={(e) => updatePollOption(index, e.target.value)}
                       placeholder={`옵션 ${index + 1}`}
-                      className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     {visiblePollOptions.length > 2 && (
                       <button
                         type="button"
                         onClick={() => removePollOption(index)}
-                        className="rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-500 hover:bg-white"
+                        className="rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-500 hover:bg-white"
                       >
                         삭제
                       </button>
@@ -223,7 +282,7 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
                 <button
                   type="button"
                   onClick={addPollOption}
-                  className="w-full rounded-lg border border-dashed border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
+                  className="w-full rounded-xl border border-dashed border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
                 >
                   옵션 추가
                 </button>
@@ -239,9 +298,11 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
               value={content}
               onChange={(e) => setContent(e.target.value.slice(0, MAX_CONTENT))}
               rows={7}
-              placeholder={kind === 'poll' ? '투표에 대한 설명을 적어주세요.' : '내용을 입력해주세요.'}
+              placeholder={
+                kind === 'poll' ? '투표 질문과 상황을 자세히 적어주세요.' : '내용을 입력해주세요.'
+              }
               required
-              className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm leading-6 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full resize-none rounded-2xl border border-slate-300 px-3 py-2 text-sm leading-6 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <p
               className={`mt-0.5 text-right text-xs ${
@@ -252,32 +313,135 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
             </p>
           </div>
 
-          <label className="flex cursor-pointer items-start gap-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              checked={isAnonymous}
-              onChange={(e) => setIsAnonymous(e.target.checked)}
-              className="mt-0.5 rounded"
-            />
-            <span>
-              <span className="block font-medium text-slate-800">익명으로 게시</span>
-              <span className="mt-0.5 block text-xs leading-5 text-slate-500">
-                프로필 대신 익명 별칭으로 표시돼요.
+          {kind === 'text' && (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">사진 첨부</p>
+                  <p className="mt-0.5 text-xs text-slate-500">클릭하거나 드래그해서 바로 넣을 수 있어요.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={openFilePicker}
+                  className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                >
+                  사진 추가
+                </button>
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+              />
+
+              {!imagePreview ? (
+                <button
+                  type="button"
+                  onClick={openFilePicker}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDraggingImage(true);
+                  }}
+                  onDragLeave={() => setIsDraggingImage(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDraggingImage(false);
+                    handleFile(e.dataTransfer.files?.[0] ?? null);
+                  }}
+                  className={`mt-3 flex w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 py-7 text-center transition-colors ${
+                    isDraggingImage ? 'border-blue-400 bg-blue-50' : 'border-slate-300 bg-white hover:border-slate-400'
+                  }`}
+                >
+                  <span className="text-sm font-medium text-slate-700">사진을 끌어다 놓거나 클릭해서 첨부</span>
+                  <span className="mt-1 text-xs text-slate-400">PNG, JPG, WebP · 최대 10MB</span>
+                </button>
+              ) : (
+                <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                  <div className="flex items-start gap-3 p-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={imagePreview}
+                      alt="첨부 이미지 미리보기"
+                      className="h-20 w-20 rounded-xl object-cover"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-slate-900">선택된 사진</p>
+                      <p className="mt-1 truncate text-xs text-slate-500">{imageFile?.name}</p>
+                      <p className="mt-2 text-xs text-slate-400">다른 사진으로 바꾸려면 아래 버튼을 눌러주세요.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleFile(null)}
+                      className="rounded-full px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                  <div className="border-t border-slate-100 bg-slate-50 px-3 py-2">
+                    <button
+                      type="button"
+                      onClick={openFilePicker}
+                      className="text-sm font-medium text-blue-700 hover:text-blue-800"
+                    >
+                      사진 교체
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">익명 게시</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  선택한 게시판 규칙에 맞게 익명 여부가 자동 조정돼요.
+                </p>
+              </div>
+              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-500 ring-1 ring-slate-200">
+                {isAnonymousForced ? '자동 익명' : isRealNameOnly ? '실명 고정' : '선택 가능'}
               </span>
-            </span>
-          </label>
+            </div>
+
+            {canToggleAnonymous ? (
+              <label className="flex cursor-pointer items-start gap-2 rounded-xl bg-white p-3 text-sm text-slate-700 ring-1 ring-slate-200">
+                <input
+                  type="checkbox"
+                  checked={isAnonymous}
+                  onChange={(e) => setIsAnonymous(e.target.checked)}
+                  className="mt-0.5 rounded border-slate-300"
+                />
+                <span>
+                  <span className="block font-medium text-slate-800">익명으로 게시</span>
+                  <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                    프로필 대신 익명 별칭으로 표시돼요.
+                  </span>
+                </span>
+              </label>
+            ) : (
+              <div className="rounded-xl bg-white p-3 text-sm text-slate-700 ring-1 ring-slate-200">
+                {isRealNameOnly
+                  ? '이 게시판은 실명으로만 작성할 수 있어요.'
+                  : '이 게시판은 항상 익명으로 작성돼요.'}
+              </div>
+            )}
+          </div>
 
           <button
             type="button"
             onClick={() => setShowAdvanced((value) => !value)}
             aria-expanded={showAdvanced}
-            className="w-full rounded-lg border border-dashed border-slate-300 px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="w-full rounded-2xl border border-dashed border-slate-300 px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
             {showAdvanced ? '추가 옵션 닫기' : '추가 옵션 열기'}
           </button>
 
           {showAdvanced && (
-            <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div>
                 <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">
                   제목
@@ -286,8 +450,8 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value.slice(0, MAX_TITLE))}
-                  placeholder="제목은 선택 사항입니다."
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="제목이 있으면 더 읽기 좋아요"
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 {title.length > MAX_TITLE * 0.8 && (
                   <p
@@ -305,24 +469,22 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
                   글 분류
                 </label>
                 <div className="flex flex-wrap gap-1.5">
-                  {FLAIRS.map((f) => (
+                  {FLAIRS.map((item) => (
                     <button
-                      key={f.value}
+                      key={item.value}
                       type="button"
-                      onClick={() => setFlair(flair === f.value ? '' : f.value)}
+                      onClick={() => setFlair(flair === item.value ? '' : item.value)}
                       className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
-                        flair === f.value
-                          ? f.color
+                        flair === item.value
+                          ? item.color
                           : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50'
                       }`}
                     >
-                      {f.label}
+                      {item.label}
                     </button>
                   ))}
                 </div>
               </div>
-
-              {kind === 'text' && <ImageUpload onFile={handleFile} preview={imagePreview} />}
             </div>
           )}
 
@@ -332,14 +494,14 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-lg border border-slate-300 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              className="flex-1 rounded-xl border border-slate-300 py-2 text-sm text-slate-700 hover:bg-slate-50"
             >
               취소
             </button>
             <button
               type="submit"
               disabled={uploading || createPost.isLoading}
-              className="flex-1 rounded-lg bg-blue-600 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              className="flex-1 rounded-xl bg-blue-600 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
             >
               {uploading ? '업로드 중...' : createPost.isLoading ? '게시 중...' : '게시하기'}
             </button>
