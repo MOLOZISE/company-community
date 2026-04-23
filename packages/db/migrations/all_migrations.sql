@@ -279,3 +279,14 @@ CREATE INDEX IF NOT EXISTS idx_posts_global_new
 
 CREATE INDEX IF NOT EXISTS idx_posts_global_top
   ON posts (is_deleted, upvote_count DESC);
+
+
+-- ============================================================
+-- 006: channel directory performance indexes
+-- ============================================================
+
+CREATE INDEX IF NOT EXISTS idx_channels_directory
+  ON channels (type, display_order, member_count);
+
+CREATE INDEX IF NOT EXISTS idx_channel_members_user_id
+  ON channel_members (user_id);

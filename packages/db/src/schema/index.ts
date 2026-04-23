@@ -76,6 +76,7 @@ export const channels = pgTable(
       slugIdx: uniqueIndex('idx_channels_slug').on(table.slug),
       createdByIdx: index('idx_channels_created_by').on(table.createdBy),
       typeIdx: index('idx_channels_type').on(table.type),
+      directoryIdx: index('idx_channels_directory').on(table.type, table.displayOrder, table.memberCount),
     };
   }
 );
@@ -350,6 +351,7 @@ export const channelMembers = pgTable(
   (table) => {
     return {
       pk: uniqueIndex('idx_channel_members_pk').on(table.channelId, table.userId),
+      userIdIdx: index('idx_channel_members_user_id').on(table.userId),
     };
   }
 );
