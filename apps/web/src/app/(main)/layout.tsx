@@ -3,13 +3,21 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/auth';
 import { Sidebar } from '@/components/Sidebar';
 import { NotificationBell } from '@/components/NotificationBell';
 import { SearchBar } from '@/components/SearchBar';
-import { RightSidebar } from '@/components/RightSidebar';
 import { usePresence } from '@/hooks/usePresence';
+
+const RightSidebar = dynamic(
+  () => import('@/components/RightSidebar').then((mod) => mod.RightSidebar),
+  {
+    ssr: false,
+    loading: () => <aside className="hidden xl:block xl:w-72 xl:shrink-0" />,
+  }
+);
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();

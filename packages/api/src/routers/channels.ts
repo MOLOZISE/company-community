@@ -85,6 +85,28 @@ export const channelsRouter = router({
     }),
 
   /**
+   * Lightweight board summary list for the home page.
+   * Avoids expensive per-channel post title subqueries.
+   */
+  getHomeBoards: publicProcedure.query(async () => {
+    const items = await db
+      .select({
+        id: channels.id,
+        slug: channels.slug,
+        name: channels.name,
+        description: channels.description,
+        postCount: channels.postCount,
+        sidebarSection: channels.sidebarSection,
+      })
+      .from(channels)
+      .where(eq(channels.type, 'board'))
+      .orderBy(asc(channels.displayOrder), desc(channels.memberCount))
+      .limit(20);
+
+    return { items, hasMore: false };
+  }),
+
+  /**
    * Get single channel by id
    */
   getById: publicProcedure

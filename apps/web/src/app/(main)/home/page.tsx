@@ -8,7 +8,6 @@ import { PostCard } from '@/components/PostCard';
 import { PostCardSkeleton } from '@/components/Skeleton';
 import { PostCreateModal } from '@/components/PostCreateModal';
 import { normalizeBoardSection } from '@/lib/channel-groups';
-import { BOARD_LIST_QUERY } from '@/lib/channel-directory';
 
 export default function HomePage() {
   const { user } = useAuthStore();
@@ -21,7 +20,7 @@ export default function HomePage() {
   }, []);
 
   const hotFeed = trpc.posts.getFeed.useQuery({ sort: 'hot', limit: 5, offset: 0 }, { enabled: ready });
-  const boardsData = trpc.channels.getList.useQuery(BOARD_LIST_QUERY, { enabled: ready });
+  const boardsData = trpc.channels.getHomeBoards.useQuery(undefined, { enabled: ready });
 
   const hotPostIds = useMemo(() => hotFeed.data?.items.map((post) => post.id) ?? [], [hotFeed.data?.items]);
   const { data: hotSavedMap = {} as Record<string, boolean> } = trpc.saves.getIsSavedMap.useQuery(
