@@ -5,21 +5,18 @@ import Link from 'next/link';
 import { trpc } from '@/lib/trpc';
 import { PostCreateModal } from '@/components/PostCreateModal';
 import { useAuthStore } from '@/store/auth';
+import { CHANNEL_LIST_QUERY } from '@/lib/channel-directory';
 
 export default function BoardsPage() {
   const [showModal, setShowModal] = useState(false);
   const { user } = useAuthStore();
 
-  const { data: boardsData, isLoading } = trpc.channels.getList.useQuery({
-    limit: 50,
-    offset: 0,
-    type: 'board',
-  });
+  const { data: channelsData, isLoading } = trpc.channels.getList.useQuery(CHANNEL_LIST_QUERY);
   const { data: myChannelIds } = trpc.channels.getMyMemberships.useQuery(undefined, {
     enabled: !!user,
   });
 
-  const boards = boardsData?.items ?? [];
+  const boards = (channelsData?.items ?? []).filter((channel) => channel.type === 'board');
   const myBoards = boards.filter((b) => myChannelIds?.includes(b.id));
   const otherBoards = boards.filter((b) => !myChannelIds?.includes(b.id));
 

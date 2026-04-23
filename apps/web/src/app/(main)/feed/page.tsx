@@ -12,6 +12,7 @@ import { OnboardingCard } from '@/components/OnboardingCard';
 import { trpc } from '@/lib/trpc';
 import { useAuthStore } from '@/store/auth';
 import { usePresence } from '@/hooks/usePresence';
+import { CHANNEL_LIST_QUERY } from '@/lib/channel-directory';
 
 export default function FeedPage() {
   const router = useRouter();
@@ -22,10 +23,9 @@ export default function FeedPage() {
   const [feedKey, setFeedKey] = useState(0);
   const { user } = useAuthStore();
 
-  const { data: channelsData } = trpc.channels.getList.useQuery(
-    { limit: 50, offset: 0 },
-    { enabled: !!channelId }
-  );
+  const { data: channelsData } = trpc.channels.getList.useQuery(CHANNEL_LIST_QUERY, {
+    enabled: !!channelId,
+  });
   const { data: myChannelIds, refetch: refetchMemberships } = trpc.channels.getMyMemberships.useQuery(undefined, {
     enabled: !!user,
   });

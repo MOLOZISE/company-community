@@ -5,22 +5,19 @@ import Link from 'next/link';
 import { trpc } from '@/lib/trpc';
 import { PostCreateModal } from '@/components/PostCreateModal';
 import { useAuthStore } from '@/store/auth';
+import { CHANNEL_LIST_QUERY } from '@/lib/channel-directory';
 
 export default function SpacesPage() {
   const [showModal, setShowModal] = useState(false);
   const { user } = useAuthStore();
 
-  const { data: spacesData, isLoading } = trpc.channels.getList.useQuery({
-    limit: 50,
-    offset: 0,
-    type: 'space',
-  });
+  const { data: channelsData, isLoading } = trpc.channels.getList.useQuery(CHANNEL_LIST_QUERY);
   const { data: myChannelIds } = trpc.channels.getMyMemberships.useQuery(undefined, {
     enabled: !!user,
   });
   const join = trpc.channels.join.useMutation();
 
-  const spaces = spacesData?.items ?? [];
+  const spaces = (channelsData?.items ?? []).filter((channel) => channel.type === 'space');
   const mySpaces = spaces.filter((s) => myChannelIds?.includes(s.id));
   const otherSpaces = spaces.filter((s) => !myChannelIds?.includes(s.id));
 

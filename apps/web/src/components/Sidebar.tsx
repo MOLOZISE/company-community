@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { trpc } from '@/lib/trpc';
+import { CHANNEL_LIST_QUERY } from '@/lib/channel-directory';
 import { ChannelRequestModal } from './ChannelRequestModal';
 import { useAuthStore } from '@/store/auth';
 
@@ -75,7 +76,7 @@ export function Sidebar({ onNavigate, onlineUserCount = 0 }: SidebarProps = {}) 
   const [showRequestModal, setShowRequestModal] = useState(false);
   const { user } = useAuthStore();
 
-  const { data: channelsData } = trpc.channels.getList.useQuery({ limit: 100, offset: 0 });
+  const { data: channelsData } = trpc.channels.getList.useQuery(CHANNEL_LIST_QUERY);
   const { data: myChannelIds, refetch: refetchMemberships } = trpc.channels.getMyMemberships.useQuery(undefined, {
     enabled: !!user,
   });

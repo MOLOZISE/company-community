@@ -6,6 +6,7 @@ import { ImageUpload } from './ImageUpload';
 import { uploadPostImage } from '@/lib/storage';
 import { toast } from '@/store/toast';
 import { FLAIRS } from '@/lib/flair';
+import { CHANNEL_LIST_QUERY } from '@/lib/channel-directory';
 
 const MAX_TITLE = 300;
 const MAX_CONTENT = 10000;
@@ -31,7 +32,7 @@ export function PostCreateModal({ onClose, onCreated, defaultChannelId }: PostCr
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
 
-  const { data: channelsData } = trpc.channels.getList.useQuery({ limit: 50, offset: 0 });
+  const { data: channelsData } = trpc.channels.getList.useQuery(CHANNEL_LIST_QUERY);
   const createPost = trpc.posts.create.useMutation();
 
   const visiblePollOptions = useMemo(() => pollOptions.slice(0, MAX_POLL_OPTIONS), [pollOptions]);
