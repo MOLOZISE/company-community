@@ -5,9 +5,6 @@ import { useRouter } from 'next/navigation';
 import { InfinitePostList } from '@/components/InfinitePostList';
 import { PostCreateModal } from '@/components/PostCreateModal';
 import { FlairChips } from '@/components/FlairChips';
-import { CommunityStatsCard } from '@/components/CommunityStatsCard';
-import { TrendingTopicsCard } from '@/components/TrendingTopicsCard';
-import { ActiveChannelsCard } from '@/components/ActiveChannelsCard';
 import { trpc } from '@/lib/trpc';
 
 const POSTING_MODE_LABELS: Record<string, string> = {
@@ -30,31 +27,15 @@ export default function BoardDetailPage({
   const [feedKey, setFeedKey] = useState(0);
 
   const { data: channel, isLoading, error } = trpc.channels.getBySlug.useQuery({ slug });
-  const { data: communityStats } = trpc.trending.getCommunityStats.useQuery();
-  const { data: trendingTopics } = trpc.trending.getTrendingTopics.useQuery();
-  const { data: activeChannels } = trpc.trending.getActiveChannels.useQuery();
 
   function handleFlairChange(flair: string | undefined) {
     const url = flair ? `/boards/${slug}?flair=${flair}` : `/boards/${slug}`;
     router.push(url);
   }
 
-  const sidebar = (
-    <aside className="hidden xl:block xl:w-80 xl:shrink-0">
-      <div className="sticky top-6 space-y-4">
-        <CommunityStatsCard stats={communityStats} />
-        <TrendingTopicsCard topics={trendingTopics} />
-        <ActiveChannelsCard channels={activeChannels} />
-      </div>
-    </aside>
-  );
-
   function BoardShell({ children }: { children: ReactNode }) {
     return (
-      <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-6">
-        <div className="min-w-0 space-y-5">{children}</div>
-        {sidebar}
-      </div>
+      <div className="min-w-0 space-y-5">{children}</div>
     );
   }
 
