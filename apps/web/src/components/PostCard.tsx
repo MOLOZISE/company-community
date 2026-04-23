@@ -206,50 +206,68 @@ export function PostCard({ post, onDeleted, isSaved: isSavedProp }: PostCardProp
         </div>
       </div>
 
-      <div className="group block">
-        {post.title && (
-          <Link href={`/posts/${post.id}`} className="block">
-            <h3 className="mb-1 text-base font-semibold leading-6 text-slate-950 group-hover:text-blue-600">
-              {post.title}
-            </h3>
-          </Link>
-        )}
-        <HashtagText text={post.content} className="block line-clamp-3 whitespace-pre-wrap text-sm leading-6 text-slate-600" />
-
-        {firstImage && (
-          <Link href={`/posts/${post.id}`} className="block">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={firstImage}
-              alt=""
-              loading="lazy"
-              className="mt-3 aspect-[16/9] max-h-64 w-full rounded-lg object-cover"
+      {firstImage ? (
+        <div className="group flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            {post.title && (
+              <Link href={`/posts/${post.id}`} className="block">
+                <h3 className="mb-1 text-base font-semibold leading-6 text-slate-950 group-hover:text-blue-600">
+                  {post.title}
+                </h3>
+              </Link>
+            )}
+            <HashtagText
+              text={post.content}
+              className="block line-clamp-2 whitespace-pre-wrap text-sm leading-6 text-slate-600"
             />
+          </div>
+
+          <Link href={`/posts/${post.id}`} className="shrink-0">
+            <div className="h-24 w-28 overflow-hidden rounded-lg">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={firstImage} alt="" loading="lazy" className="h-full w-full object-cover" />
+            </div>
           </Link>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="group block">
+          {post.title && (
+            <Link href={`/posts/${post.id}`} className="block">
+              <h3 className="mb-1 text-base font-semibold leading-6 text-slate-950 group-hover:text-blue-600">
+                {post.title}
+              </h3>
+            </Link>
+          )}
+          <HashtagText
+            text={post.content}
+            className="block line-clamp-3 whitespace-pre-wrap text-sm leading-6 text-slate-600"
+          />
+        </div>
+      )}
 
       {post.kind === 'poll' && <PollCard postId={post.id} />}
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-        <Metric label="추천" value={post.upvoteCount ?? 0} />
-        <Metric label="댓글" value={post.commentCount ?? 0} strong={(post.commentCount ?? 0) > 0} />
-        <Metric label="조회" value={post.viewCount ?? 0} />
-        <Metric label="hot" value={Math.round(hotScore * 10) / 10} strong={heat > 0.4} />
+      <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+        <span className="inline-flex items-center gap-1">
+          <span aria-hidden="true">👍</span>
+          <span>{post.upvoteCount ?? 0}</span>
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span aria-hidden="true">💬</span>
+          <span>{post.commentCount ?? 0}</span>
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span aria-hidden="true">👁</span>
+          <span>{post.viewCount ?? 0}</span>
+        </span>
+        {hotScore > 5 && (
+          <span className="inline-flex items-center gap-1">
+            <span aria-hidden="true">🔥</span>
+            <span>hot</span>
+          </span>
+        )}
       </div>
     </article>
-  );
-}
-
-function Metric({ label, value, strong = false }: { label: string; value: number; strong?: boolean }) {
-  return (
-    <span
-      className={`rounded-full px-2.5 py-1 ring-1 ${
-        strong ? 'bg-blue-50 text-blue-700 ring-blue-100' : 'bg-slate-50 text-slate-500 ring-slate-100'
-      }`}
-    >
-      {label} {value}
-    </span>
   );
 }
 

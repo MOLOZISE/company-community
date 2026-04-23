@@ -53,7 +53,7 @@ const BOARD_SECTION_KEYS: SidebarSectionKey[] = BOARD_SECTION_ORDER.map((section
 const BOARD_LIMIT = 6;
 
 const UI_TEXT = {
-  spacesSection: '\u{1F3AF} \ub0b4 \uacf5\uac04',
+  spacesSection: '\u{1F3AF} \uc18c\ubaa8\uc784',
   spacesAll: '\uacf5\uac04 \uc804\uccb4\ubcf4\uae30',
   admin: '\u2699 \uad00\ub9ac',
   adminChannels: '\ucc44\ub110 \uc694\uccad \uad00\ub9ac',
