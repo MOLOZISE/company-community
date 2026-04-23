@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, protectedProcedure } from '../trpc.js';
-import { db, posts, profiles, channels, pollOptions, postTags } from '@repo/db';
+import { db, posts, profiles, channels, pollOptions, postTags, featuredPosts } from '@repo/db';
 import { eq, desc, and, sql, ilike, or, getTableColumns } from 'drizzle-orm';
 import { normalizePollOptions } from './polls.js';
 
@@ -438,10 +438,20 @@ export const postsRouter = router({
   incrementViewCount: publicProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
-      await db
+      const [updated] = await db
         .update(posts)
         .set({ viewCount: sql`${posts.viewCount} + 1` })
-        .where(eq(posts.id, input.id));
+        .where(eq(posts.id, input.id))
+        .returning({ viewCount: posts.viewCount });
+
+      const viewCount = Number(updated?.viewCount ?? 0);
+      if (viewCount >= 1000) {
+        await db
+          .insert(featuredPosts)
+          .values({ postId: input.id, viewCountAtFeature: viewCount })
+          .onConflictDoNothing();
+      }
+
       return { success: true };
     }),
 });

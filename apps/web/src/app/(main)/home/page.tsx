@@ -21,19 +21,19 @@ export default function HomePage() {
   }, []);
 
   const hotFeed = trpc.posts.getFeed.useQuery({ sort: 'hot', limit: 5, offset: 0 }, { enabled: ready });
-  const newFeed = trpc.posts.getFeed.useQuery({ sort: 'new', limit: 4, offset: 0 }, { enabled: ready });
+  const featuredFeed = trpc.trending.getFeaturedPosts.useQuery(undefined, { enabled: ready });
   const boardsData = trpc.channels.getList.useQuery(BOARD_LIST_QUERY, { enabled: ready });
 
   const hotPostIds = useMemo(() => hotFeed.data?.items.map((post) => post.id) ?? [], [hotFeed.data?.items]);
-  const newPostIds = useMemo(() => newFeed.data?.items.map((post) => post.id) ?? [], [newFeed.data?.items]);
+  const featuredPostIds = useMemo(() => featuredFeed.data?.map((post) => post.id) ?? [], [featuredFeed.data]);
 
   const { data: hotSavedMap = {} as Record<string, boolean> } = trpc.saves.getIsSavedMap.useQuery(
     { postIds: hotPostIds },
     { enabled: ready && !!user && hotPostIds.length > 0 }
   );
-  const { data: newSavedMap = {} as Record<string, boolean> } = trpc.saves.getIsSavedMap.useQuery(
-    { postIds: newPostIds },
-    { enabled: ready && !!user && newPostIds.length > 0 }
+  const { data: featuredSavedMap = {} as Record<string, boolean> } = trpc.saves.getIsSavedMap.useQuery(
+    { postIds: featuredPostIds },
+    { enabled: ready && !!user && featuredPostIds.length > 0 }
   );
 
   const quickBoards = useMemo(() => {
@@ -134,7 +134,7 @@ export default function HomePage() {
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-bold text-slate-950">🔥 오늘의 인기글</h2>
-          <Link href="/feed" className="text-xs font-medium text-blue-600 hover:text-blue-700">
+          <Link href="/popular" className="text-xs font-medium text-blue-600 hover:text-blue-700">
             더보기 →
           </Link>
         </div>
@@ -158,10 +158,10 @@ export default function HomePage() {
             더보기 →
           </Link>
         </div>
-        {newFeed.isLoading
+        {featuredFeed.isLoading
           ? Array.from({ length: 4 }).map((_, i) => <PostCardSkeleton key={i} />)
-          : (newFeed.data?.items ?? []).map((post) => (
-              <PostCard key={post.id} post={post} isSaved={newSavedMap[post.id] ?? false} />
+          : (featuredFeed.data ?? []).map((post) => (
+              <PostCard key={post.id} post={post} isSaved={featuredSavedMap[post.id] ?? false} />
             ))}
       </section>
 

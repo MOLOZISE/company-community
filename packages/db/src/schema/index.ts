@@ -164,6 +164,26 @@ export const posts = pgTable(
 );
 
 // ============================================
+// Featured Posts (popularity cache / pointer table)
+// ============================================
+export const featuredPosts = pgTable(
+  'featured_posts',
+  {
+    postId: uuid('post_id')
+      .primaryKey()
+      .references(() => posts.id, { onDelete: 'cascade' }),
+    featuredAt: timestamp('featured_at', { withTimezone: true }).defaultNow(),
+    viewCountAtFeature: integer('view_count_at_feature').default(0),
+  },
+  (table) => {
+    return {
+      featuredAtIdx: index('idx_featured_posts_featured_at').on(table.featuredAt),
+      viewCountIdx: index('idx_featured_posts_view_count_at_feature').on(table.viewCountAtFeature),
+    };
+  }
+);
+
+// ============================================
 // Saves / Bookmarks
 // ============================================
 export const saves = pgTable(
