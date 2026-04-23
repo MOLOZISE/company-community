@@ -62,6 +62,7 @@ export const channels = pgTable(
     // --- board/space pivot: additive metadata (all nullable/defaulted for backward compat) ---
     type: varchar('type', { length: 50 }).default('board'),             // 'board' | 'space'
     scope: varchar('scope', { length: 50 }).default('company'),         // 'company' | 'subsidiary' | 'department' | 'project' | 'interest'
+    sidebarSection: varchar('sidebar_section', { length: 50 }).default('company'),
     postingMode: varchar('posting_mode', { length: 50 }).default('anonymous_allowed'), // 'real_only' | 'anonymous_allowed' | 'anonymous_only'
     membershipType: varchar('membership_type', { length: 50 }).default('open'), // 'open' | 'request' | 'invite'
     isListed: boolean('is_listed').default(true),

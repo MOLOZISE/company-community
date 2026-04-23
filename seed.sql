@@ -13,6 +13,7 @@ ALTER TABLE notifications ADD COLUMN IF NOT EXISTS post_id UUID REFERENCES posts
 ALTER TABLE channels
   ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'board',
   ADD COLUMN IF NOT EXISTS scope VARCHAR(50) DEFAULT 'company',
+  ADD COLUMN IF NOT EXISTS sidebar_section VARCHAR(50) DEFAULT 'company',
   ADD COLUMN IF NOT EXISTS posting_mode VARCHAR(50) DEFAULT 'anonymous_allowed',
   ADD COLUMN IF NOT EXISTS membership_type VARCHAR(50) DEFAULT 'open',
   ADD COLUMN IF NOT EXISTS is_listed BOOLEAN DEFAULT true,
@@ -356,203 +357,203 @@ COMMIT;
 -- =============================================================
 BEGIN;
 
-INSERT INTO channels (id, slug, name, description, type, scope, posting_mode, membership_type,
+INSERT INTO channels (id, slug, name, description, type, scope, sidebar_section, posting_mode, membership_type,
   is_listed, is_private, default_sort, purpose, display_order, member_count, post_count, created_by, created_at)
 VALUES
 -- ── 전사 공통 게시판 ──
 ('10000000-0000-0000-0000-000000000001','notice','회사 공지',
  '임원진 및 공식 발표사항을 공유하는 공지 채널입니다. 중요 안내사항을 놓치지 마세요.',
- 'board','company','real_only','open',true,false,'pinned','announcement',1,2845,48,
+ 'board','company','announcement','real_only','open',true,false,'pinned','announcement',1,2845,48,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '90 days'),
 
 ('10000000-0000-0000-0000-000000000002','free','자유게시판',
  '업무와 관련 없는 다양한 이야기를 나누는 공간입니다. 취미, 일상, 관심사 무엇이든 OK!',
- 'board','company','anonymous_allowed','open',true,false,'hot','social',2,2845,312,
+ 'board','company','company','anonymous_allowed','open',true,false,'hot','social',2,2845,312,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '90 days'),
 
 ('10000000-0000-0000-0000-000000000003','anonymous','익명게시판',
  '완전 익명으로 솔직한 의견을 나눌 수 있는 공간입니다. 서로 존중하는 문화를 만들어요.',
- 'board','company','anonymous_only','open',true,false,'hot','discussion',3,2845,287,
+ 'board','company','company','anonymous_only','open',true,false,'hot','discussion',3,2845,287,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '90 days'),
 
 ('10000000-0000-0000-0000-000000000004','qna','질문과 답변',
  '업무, 복지, 회사 생활에 관한 궁금증을 해결해 드립니다. 어떤 질문이든 환영합니다!',
- 'board','company','anonymous_allowed','open',true,false,'latest','discussion',4,2845,198,
+ 'board','company','company','anonymous_allowed','open',true,false,'latest','discussion',4,2845,198,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '88 days'),
 
 ('10000000-0000-0000-0000-000000000005','knowledge','정보공유',
  '업무에 유용한 정보, 노하우, 외부 콘텐츠를 공유하는 게시판입니다.',
- 'board','company','anonymous_allowed','open',true,false,'hot','knowledge',5,2845,156,
+ 'board','company','company','anonymous_allowed','open',true,false,'hot','knowledge',5,2845,156,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '88 days'),
 
 ('10000000-0000-0000-0000-000000000006','praise','칭찬합시다',
  '동료의 좋은 점을 실명으로 칭찬해보세요. 긍정적인 문화를 함께 만들어 갑니다.',
- 'board','company','real_only','open',true,false,'latest','social',6,2845,89,
+ 'board','company','company','real_only','open',true,false,'latest','social',6,2845,89,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '88 days'),
 
 ('10000000-0000-0000-0000-000000000007','ideas','아이디어 제안',
  '업무 개선, 복지 향상, 문화 혁신을 위한 아이디어를 자유롭게 제안해주세요.',
- 'board','company','anonymous_allowed','open',true,false,'hot','discussion',7,2845,134,
+ 'board','company','company','anonymous_allowed','open',true,false,'hot','discussion',7,2845,134,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '87 days'),
 
 -- ── 그룹사별 게시판 ──
 ('10000000-0000-0000-0000-000000000008','hhi-board','HD현대중공업',
  'HD현대중공업 임직원들의 소식, 업무 이야기, 울산 생활 정보를 나눕니다.',
- 'board','subsidiary','anonymous_allowed','open',true,false,'latest','discussion',10,1200,203,
+ 'board','subsidiary','subsidiary','anonymous_allowed','open',true,false,'latest','discussion',10,1200,203,
  '00000000-0000-0000-0000-000000000001',NOW()-INTERVAL '85 days'),
 
 ('10000000-0000-0000-0000-000000000009','ksoe-board','HD한국조선해양',
  'HD한국조선해양(KSOE) 구성원들의 이야기를 나누는 공간입니다.',
- 'board','subsidiary','anonymous_allowed','open',true,false,'latest','discussion',11,680,145,
+ 'board','subsidiary','subsidiary','anonymous_allowed','open',true,false,'latest','discussion',11,680,145,
  '00000000-0000-0000-0000-000000000011',NOW()-INTERVAL '85 days'),
 
 ('10000000-0000-0000-0000-000000000010','hdec-board','HD현대일렉트릭',
  'HD현대일렉트릭 구성원 전용 게시판입니다. 창원/경산 생활정보도 공유해요.',
- 'board','subsidiary','anonymous_allowed','open',true,false,'latest','discussion',12,520,118,
+ 'board','subsidiary','subsidiary','anonymous_allowed','open',true,false,'latest','discussion',12,520,118,
  '00000000-0000-0000-0000-000000000017',NOW()-INTERVAL '85 days'),
 
 ('10000000-0000-0000-0000-000000000011','hshi-board','HD삼호중공업',
  'HD삼호중공업 영암 조선소 구성원들의 소통 공간입니다.',
- 'board','subsidiary','anonymous_allowed','open',true,false,'latest','discussion',13,410,97,
+ 'board','subsidiary','subsidiary','anonymous_allowed','open',true,false,'latest','discussion',13,410,97,
  '00000000-0000-0000-0000-000000000023',NOW()-INTERVAL '85 days'),
 
 ('10000000-0000-0000-0000-000000000012','hmms-board','HD현대마린솔루션',
  'HD현대마린솔루션 구성원들의 이야기를 나눕니다. 선박 AS·솔루션 분야 종사자 모여라!',
- 'board','subsidiary','anonymous_allowed','open',true,false,'latest','discussion',14,320,76,
+ 'board','subsidiary','subsidiary','anonymous_allowed','open',true,false,'latest','discussion',14,320,76,
  '00000000-0000-0000-0000-000000000029',NOW()-INTERVAL '85 days'),
 
 ('10000000-0000-0000-0000-000000000013','hhce-board','HD건설기계',
  'HD현대건설기계 구성원들의 소통 채널입니다.',
- 'board','subsidiary','anonymous_allowed','open',true,false,'latest','discussion',15,280,64,
+ 'board','subsidiary','subsidiary','anonymous_allowed','open',true,false,'latest','discussion',15,280,64,
  '00000000-0000-0000-0000-000000000035',NOW()-INTERVAL '85 days'),
 
 -- ── 소모임/동호회 (space) ──
 ('10000000-0000-0000-0000-000000000014','club-hiking','등산 소모임',
  '주말 등산을 함께 즐기는 모임입니다. 초보자도 환영! 월 1~2회 정기 산행을 진행합니다.',
- 'space','interest','anonymous_allowed','open',true,false,'latest','social',20,142,56,
+ 'space','interest','space','anonymous_allowed','open',true,false,'latest','social',20,142,56,
  '00000000-0000-0000-0000-000000000005',NOW()-INTERVAL '80 days'),
 
 ('10000000-0000-0000-0000-000000000015','club-reading','독서 소모임',
  '매월 책을 선정하고 독후감을 나누는 독서 모임입니다. 장르 불문, 독서를 좋아하면 누구나!',
- 'space','interest','anonymous_allowed','open',true,false,'latest','social',21,98,43,
+ 'space','interest','space','anonymous_allowed','open',true,false,'latest','social',21,98,43,
  '00000000-0000-0000-0000-000000000014',NOW()-INTERVAL '80 days'),
 
 ('10000000-0000-0000-0000-000000000016','club-fitness','헬스/운동 소모임',
  '운동 인증, 식단 공유, 운동 루틴 추천까지! 건강한 직장인이 모이는 곳.',
- 'space','interest','anonymous_allowed','open',true,false,'latest','social',22,187,89,
+ 'space','interest','space','anonymous_allowed','open',true,false,'latest','social',22,187,89,
  '00000000-0000-0000-0000-000000000003',NOW()-INTERVAL '78 days'),
 
 ('10000000-0000-0000-0000-000000000017','club-wine','와인 소모임',
  '와인 테이스팅, 좋은 와인 추천, 월간 와인 모임을 진행합니다. 위스키도 환영!',
- 'space','interest','anonymous_allowed','request',true,false,'latest','social',23,64,31,
+ 'space','interest','space','anonymous_allowed','request',true,false,'latest','social',23,64,31,
  '00000000-0000-0000-0000-000000000033',NOW()-INTERVAL '75 days'),
 
 ('10000000-0000-0000-0000-000000000018','club-golf','골프 소모임',
  '주말 라운딩 팀 구성, 스크린 골프 모임, 연습장 정보를 공유합니다.',
- 'space','interest','anonymous_allowed','open',true,false,'latest','social',24,156,72,
+ 'space','interest','space','anonymous_allowed','open',true,false,'latest','social',24,156,72,
  '00000000-0000-0000-0000-000000000010',NOW()-INTERVAL '75 days'),
 
 ('10000000-0000-0000-0000-000000000019','club-photography','사진 소모임',
  'DSLR, 미러리스, 스마트폰 카메라로 찍은 사진을 공유하고 피드백 받는 공간입니다.',
- 'space','interest','anonymous_allowed','open',true,false,'latest','social',25,87,38,
+ 'space','interest','space','anonymous_allowed','open',true,false,'latest','social',25,87,38,
  '00000000-0000-0000-0000-000000000009',NOW()-INTERVAL '73 days'),
 
 ('10000000-0000-0000-0000-000000000020','club-gaming','게임 소모임',
  'PC, 콘솔, 모바일 게임 모두 환영! 같이 팀 짜서 게임할 사람 구해요.',
- 'space','interest','anonymous_allowed','open',true,false,'latest','social',26,213,97,
+ 'space','interest','space','anonymous_allowed','open',true,false,'latest','social',26,213,97,
  '00000000-0000-0000-0000-000000000007',NOW()-INTERVAL '73 days'),
 
 ('10000000-0000-0000-0000-000000000021','club-cooking','요리/맛집 소모임',
  '집밥 레시피 공유, 맛집 탐방, 요리 클래스 정보까지! 먹는 걸 좋아하는 분들 모여요.',
- 'space','interest','anonymous_allowed','open',true,false,'latest','social',27,124,61,
+ 'space','interest','space','anonymous_allowed','open',true,false,'latest','social',27,124,61,
  '00000000-0000-0000-0000-000000000004',NOW()-INTERVAL '71 days'),
 
 -- 생활/재미 게시판
 ('10000000-0000-0000-0000-000000000022','blind-date','사내 소개팅',
  '사내 소개팅 신청, 후기, 만남 주선까지! 모든 내용은 익명으로 운영됩니다.',
- 'board','company','anonymous_allowed','open',true,false,'hot','social',30,2845,167,
+ 'board','company','lifestyle','anonymous_allowed','open',true,false,'hot','social',30,2845,167,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '70 days'),
 
 ('10000000-0000-0000-0000-000000000023','stock-market','주식/재테크',
  '주식, ETF, 부동산, 코인 등 재테크 정보를 나누는 공간입니다. 투자는 본인 책임!',
- 'board','company','anonymous_allowed','open',true,false,'hot','discussion',31,2845,234,
+ 'board','company','lifestyle','anonymous_allowed','open',true,false,'hot','discussion',31,2845,234,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '70 days'),
 
 ('10000000-0000-0000-0000-000000000024','restaurant','맛집 추천',
  '울산, 서울, 창원, 영암 등 사업장 인근 맛집을 추천하고 후기를 공유합니다.',
- 'board','company','anonymous_allowed','open',true,false,'hot','social',32,2845,289,
+ 'board','company','lifestyle','anonymous_allowed','open',true,false,'hot','social',32,2845,289,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '69 days'),
 
 ('10000000-0000-0000-0000-000000000025','house-info','부동산/이사 정보',
  '전세, 월세, 아파트 매매, 이사 정보를 공유합니다. 집 구하는 분들 여기 모여요!',
- 'board','company','anonymous_allowed','open',true,false,'latest','discussion',33,2845,145,
+ 'board','company','lifestyle','anonymous_allowed','open',true,false,'latest','discussion',33,2845,145,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '69 days'),
 
 ('10000000-0000-0000-0000-000000000026','car-talk','자동차',
  '자동차 구매 후기, 정비 팁, 중고차 정보, 차박 명소까지! 자동차 좋아하는 분들 환영.',
- 'board','company','anonymous_allowed','open',true,false,'hot','social',34,2845,178,
+ 'board','company','lifestyle','anonymous_allowed','open',true,false,'hot','social',34,2845,178,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '68 days'),
 
 ('10000000-0000-0000-0000-000000000027','travel','여행 정보',
  '국내외 여행 후기, 숙소 추천, 여행 계획을 공유하는 게시판입니다.',
- 'board','company','anonymous_allowed','open',true,false,'hot','social',35,2845,212,
+ 'board','company','lifestyle','anonymous_allowed','open',true,false,'hot','social',35,2845,212,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '68 days'),
 
 ('10000000-0000-0000-0000-000000000028','secondhand','중고거래',
  '임직원 간 안전한 중고 물품 거래 공간입니다. 실명 거래, 직거래 원칙.',
- 'board','company','real_only','open',true,false,'latest','social',36,2845,321,
+ 'board','company','lifestyle','real_only','open',true,false,'latest','social',36,2845,321,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '67 days'),
 
 ('10000000-0000-0000-0000-000000000029','parenting','육아/가족',
  '육아, 교육, 가족 행사, 어린이집 정보 등 가족과 관련된 모든 이야기를 나눕니다.',
- 'board','company','anonymous_allowed','open',true,false,'latest','social',37,2845,123,
+ 'board','company','lifestyle','anonymous_allowed','open',true,false,'latest','social',37,2845,123,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '67 days'),
 
 -- 업무/커리어 게시판
 ('10000000-0000-0000-0000-000000000030','career','커리어/이직',
  '커리어 고민, 이직 경험담, 직무 인터뷰 팁을 익명으로 공유합니다.',
- 'board','company','anonymous_allowed','open',true,false,'hot','discussion',40,2845,198,
+ 'board','company','career','anonymous_allowed','open',true,false,'hot','discussion',40,2845,198,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '65 days'),
 
 ('10000000-0000-0000-0000-000000000031','wfh','재택근무 꿀팁',
  '재택근무 환경 셋업, 생산성 꿀팁, 재택 장비 추천을 나눕니다.',
- 'board','company','anonymous_allowed','open',true,false,'hot','knowledge',41,2845,156,
+ 'board','company','career','anonymous_allowed','open',true,false,'hot','knowledge',41,2845,156,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '65 days'),
 
 ('10000000-0000-0000-0000-000000000032','tech-stack','기술 스택',
  '개발 기술, 아키텍처, 새로운 도구에 대한 기술적인 토론을 합니다.',
- 'board','company','anonymous_allowed','open',true,false,'hot','knowledge',42,2845,167,
+ 'board','company','career','anonymous_allowed','open',true,false,'hot','knowledge',42,2845,167,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '64 days'),
 
 ('10000000-0000-0000-0000-000000000033','tool-review','업무 도구 리뷰',
  'Notion, Figma, Slack, Jira 등 업무 툴 사용 후기와 팁을 공유합니다.',
- 'board','company','anonymous_allowed','open',true,false,'latest','knowledge',43,2845,134,
+ 'board','company','career','anonymous_allowed','open',true,false,'latest','knowledge',43,2845,134,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '64 days'),
 
 ('10000000-0000-0000-0000-000000000034','onboarding','신입/이직자 온보딩',
  '입사 초기에 알면 좋은 정보, 선배들의 조언, 온보딩 경험을 공유합니다.',
- 'board','company','anonymous_allowed','open',true,false,'latest','knowledge',44,2845,89,
+ 'board','company','career','anonymous_allowed','open',true,false,'latest','knowledge',44,2845,89,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '63 days'),
 
 -- 익명 전용 게시판
 ('10000000-0000-0000-0000-000000000035','confess','직장인 고민상담',
  '직장 생활의 고민을 털어놓고 동료들의 따뜻한 조언을 받는 공간입니다. 완전 익명.',
- 'board','company','anonymous_only','open',true,false,'hot','discussion',50,2845,276,
+ 'board','company','anonymous','anonymous_only','open',true,false,'hot','discussion',50,2845,276,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '60 days'),
 
 ('10000000-0000-0000-0000-000000000036','salary','연봉/복지 공유',
  '연봉, 인상률, 복지 포인트 등을 익명으로 투명하게 공유합니다. 완전 익명.',
- 'board','company','anonymous_only','open',true,false,'hot','discussion',51,2845,312,
+ 'board','company','anonymous','anonymous_only','open',true,false,'hot','discussion',51,2845,312,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '60 days'),
 
 ('10000000-0000-0000-0000-000000000037','boss-story','상사 이야기',
  '상사 칭찬도, 하소연도 OK. 익명으로 솔직하게 털어놓는 공간.',
- 'board','company','anonymous_only','open',true,false,'hot','discussion',52,2845,234,
+ 'board','company','anonymous','anonymous_only','open',true,false,'hot','discussion',52,2845,234,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '60 days'),
 
 ('10000000-0000-0000-0000-000000000038','work-life','워라밸',
  '일과 삶의 균형에 대해 이야기 나누는 공간입니다. 번아웃 예방, 취미 생활 공유.',
- 'board','company','anonymous_only','open',true,false,'hot','discussion',53,2845,189,
+ 'board','company','anonymous','anonymous_only','open',true,false,'hot','discussion',53,2845,189,
  '00000000-0000-0000-0000-000000000039',NOW()-INTERVAL '60 days')
 ON CONFLICT (slug) DO NOTHING;
 

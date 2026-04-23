@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, protectedProcedure, assertAdmin } from '../trpc.js';
 import { db, channels, channelMembers, channelRequests, profiles } from '@repo/db';
-import { eq, desc, and, sql, ilike, or, asc, notInArray } from 'drizzle-orm';
+import { eq, desc, and, sql, ilike, or, asc, notInArray, getTableColumns } from 'drizzle-orm';
 
 function normalizeSlug(value: string) {
   return value
@@ -36,8 +36,9 @@ export const channelsRouter = router({
     )
     .query(async ({ input }) => {
       const where = input.type ? eq(channels.type, input.type) : undefined;
+      const channelColumns = getTableColumns(channels);
       const items = await db
-        .select()
+        .select(channelColumns)
         .from(channels)
         .where(where)
         .orderBy(asc(channels.displayOrder), desc(channels.memberCount))

@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import { trpc } from '@/lib/trpc';
-import { useState } from 'react';
 import { ChannelRequestModal } from './ChannelRequestModal';
 import { useAuthStore } from '@/store/auth';
 
@@ -11,6 +11,14 @@ interface SidebarProps {
   onNavigate?: () => void;
   onlineUserCount?: number;
 }
+
+type SidebarSectionKey =
+  | 'announcement'
+  | 'company'
+  | 'subsidiary'
+  | 'lifestyle'
+  | 'career'
+  | 'anonymous';
 
 type ChannelItem = {
   id: string;
@@ -21,7 +29,46 @@ type ChannelItem = {
   postingMode: string | null;
   scope: string | null;
   displayOrder: number | null;
+  sidebarSection: string | null;
 };
+
+type SectionTone = 'default' | 'slate' | 'blue' | 'orange' | 'green' | 'purple';
+
+const BOARD_SECTION_ORDER: Array<{
+  key: SidebarSectionKey;
+  label: string;
+  tone: SectionTone;
+  collapsible: boolean;
+  defaultOpen: boolean;
+}> = [
+  { key: 'announcement', label: '\u{1F4CC} \uacf5\uc9c0/\ud544\ub3c5', tone: 'default', collapsible: false, defaultOpen: true },
+  { key: 'company', label: '\u{1F3E2} \uc804\uc0ac \uac8c\uc2dc\ud310', tone: 'slate', collapsible: true, defaultOpen: true },
+  { key: 'subsidiary', label: '\u{1F3ED} \uadf8\ub8f9\uc0ac \uac8c\uc2dc\ud310', tone: 'blue', collapsible: true, defaultOpen: false },
+  { key: 'lifestyle', label: '\u{1F389} \uc0dd\ud65c/\uc7ac\ubbf8', tone: 'orange', collapsible: true, defaultOpen: false },
+  { key: 'career', label: '\u{1F4BC} \uc5c5\ubb34/\ucee4\ub9ac\uc5b4', tone: 'green', collapsible: true, defaultOpen: false },
+  { key: 'anonymous', label: '\u{1F512} \uc775\uba85 \uac8c\uc2dc\ud310', tone: 'purple', collapsible: true, defaultOpen: false },
+];
+
+const BOARD_SECTION_KEYS: SidebarSectionKey[] = BOARD_SECTION_ORDER.map((section) => section.key);
+const BOARD_LIMIT = 6;
+
+const UI_TEXT = {
+  spacesSection: '\u{1F3AF} \ub0b4 \uacf5\uac04',
+  spacesAll: '\uacf5\uac04 \uc804\uccb4\ubcf4\uae30',
+  admin: '\u2699 \uad00\ub9ac',
+  adminChannels: '\ucc44\ub110 \uc694\uccad \uad00\ub9ac',
+  adminReports: '\uc2e0\uace0 \uad00\ub9ac',
+  feed: '\ubaa8\uc544\ubcf4\uae30',
+  onlinePrefix: '\uc9c0\uae08 \ud65c\ub3d9 \uc911',
+  onlineSuffix: '\uba85',
+  request: '+ \uac8c\uc2dc\ud310/\uacf5\uac04 \uac1c\uc124 \uc694\uccad',
+  morePrefix: '\uFF0B ',
+  moreSuffix: '\uac1c \ub354 \ubcf4\uae30',
+  joinTitle: '\ucc38\uc5ec',
+  leaveTitle: '\ub098\uac00\uae30',
+  chevronDown: '\u25BE',
+  chevronRight: '\u25B8',
+} as const;
 
 export function Sidebar({ onNavigate, onlineUserCount = 0 }: SidebarProps = {}) {
   const pathname = usePathname();
@@ -43,139 +90,186 @@ export function Sidebar({ onNavigate, onlineUserCount = 0 }: SidebarProps = {}) 
   const boards = (boardsData?.items ?? []) as ChannelItem[];
   const spaces = (spacesData?.items ?? []) as ChannelItem[];
 
-  // Board taxonomy grouping
-  const noticeBoards = boards.filter((b) => b.purpose === 'announcement');
-  const anonBoards = boards.filter((b) => b.postingMode === 'anonymous_only');
-  const generalBoards = boards.filter(
-    (b) => b.purpose !== 'announcement' && b.postingMode !== 'anonymous_only'
-  );
+  const [showAllBoards, setShowAllBoards] = useState<Record<SidebarSectionKey, boolean>>({
+    announcement: true,
+    company: false,
+    subsidiary: false,
+    lifestyle: false,
+    career: false,
+    anonymous: false,
+  });
 
-  const mySpaces = spaces.filter((s) => myChannelIds?.includes(s.id));
-  const otherSpaces = spaces.filter((s) => !myChannelIds?.includes(s.id));
+  const boardGroups = useMemo(() => {
+    const grouped: Record<SidebarSectionKey, ChannelItem[]> = {
+      announcement: [],
+      company: [],
+      subsidiary: [],
+      lifestyle: [],
+      career: [],
+      anonymous: [],
+    };
 
-  function isMember(id: string) {
-    return myChannelIds?.includes(id) ?? false;
-  }
+    for (const channel of boards) {
+      const section = normalizeSidebarSection(channel.sidebarSection);
+      if (section) {
+        grouped[section].push(channel);
+      }
+    }
+
+    return grouped;
+  }, [boards]);
+
+  const activeBoardSection = useMemo(() => {
+    if (!pathname) return null;
+
+    for (const section of BOARD_SECTION_KEYS) {
+      if (boardGroups[section].some((channel) => isChannelRouteActive(pathname, boardPath(channel.slug)))) {
+        return section;
+      }
+    }
+
+    return null;
+  }, [boardGroups, pathname]);
+
+  const activeSpaceChannel = useMemo(() => {
+    if (!pathname) return false;
+    return pathname === '/spaces' || spaces.some((channel) => isChannelRouteActive(pathname, spacePath(channel.slug)));
+  }, [pathname, spaces]);
+
+  useEffect(() => {
+    if (!activeBoardSection) return;
+
+    const activeIndex = boardGroups[activeBoardSection].findIndex((channel) =>
+      isChannelRouteActive(pathname ?? '', boardPath(channel.slug))
+    );
+
+    if (activeIndex >= BOARD_LIMIT) {
+      setShowAllBoards((current) => {
+        if (current[activeBoardSection]) return current;
+        return { ...current, [activeBoardSection]: true };
+      });
+    }
+  }, [activeBoardSection, boardGroups, pathname]);
+
+  const mySpaces = spaces.filter((space) => myChannelIds?.includes(space.id));
+  const otherSpaces = spaces.filter((space) => !myChannelIds?.includes(space.id));
 
   function boardPath(slug: string) {
     return `/boards/${slug}`;
   }
+
   function spacePath(slug: string) {
     return `/spaces/${slug}`;
+  }
+
+  function handleShowAll(key: SidebarSectionKey) {
+    setShowAllBoards((current) => ({ ...current, [key]: true }));
   }
 
   return (
     <aside className="w-56 shrink-0">
       {showRequestModal && <ChannelRequestModal onClose={() => setShowRequestModal(false)} />}
-      <div className="sticky top-20 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 6rem)' }}>
 
-        {/* 공지 / 필독 */}
-        {noticeBoards.length > 0 && (
-          <NavSection label="📌 공지 / 필독">
-            {noticeBoards.map((b) => (
-              <NavLink
-                key={b.id}
-                href={boardPath(b.slug)}
-                active={pathname === boardPath(b.slug)}
-                onClick={onNavigate}
-              >
-                {b.name}
-              </NavLink>
-            ))}
-          </NavSection>
-        )}
+      <div className="sticky top-20 space-y-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 6rem)' }}>
+        {BOARD_SECTION_ORDER.map((section) => {
+          const items = boardGroups[section.key];
+          if (items.length === 0) return null;
 
-        {/* 공통 게시판 */}
-        {generalBoards.length > 0 && (
-          <NavSection label="🗂 게시판">
-            <NavLink href="/boards" active={pathname === '/boards'} onClick={onNavigate}>
-              전체 게시판
-            </NavLink>
-            {generalBoards.map((b) => (
-              <NavLink
-                key={b.id}
-                href={boardPath(b.slug)}
-                active={pathname === boardPath(b.slug)}
-                onClick={onNavigate}
-                joined={isMember(b.id)}
-                onJoinLeave={() =>
-                  isMember(b.id)
-                    ? leave.mutate({ channelId: b.id })
-                    : join.mutate({ channelId: b.id })
-                }
-              >
-                # {b.name}
-              </NavLink>
-            ))}
-          </NavSection>
-        )}
+          const visibleItems = showAllBoards[section.key] ? items : items.slice(0, BOARD_LIMIT);
 
-        {/* 익명 게시판 */}
-        {anonBoards.length > 0 && (
-          <NavSection label="🔒 익명 게시판">
-            {anonBoards.map((b) => (
-              <NavLink
-                key={b.id}
-                href={boardPath(b.slug)}
-                active={pathname === boardPath(b.slug)}
-                onClick={onNavigate}
-              >
-                {b.name}
-              </NavLink>
-            ))}
-          </NavSection>
-        )}
+          return (
+            <NavSection
+              key={section.key}
+              label={section.label}
+              count={items.length}
+              collapsible={section.collapsible}
+              defaultOpen={section.defaultOpen}
+              active={activeBoardSection === section.key}
+              tone={section.tone}
+            >
+              {visibleItems.map((channel) => (
+                <NavLink
+                  key={channel.id}
+                  href={boardPath(channel.slug)}
+                  active={isChannelRouteActive(pathname, boardPath(channel.slug))}
+                  onClick={onNavigate}
+                >
+                  {channel.name}
+                </NavLink>
+              ))}
 
-        {/* 내 공간 */}
-        <NavSection label="🚀 내 공간">
-          <NavLink href="/spaces" active={pathname === '/spaces'} onClick={onNavigate}>
-            공간 탐색
+              {!showAllBoards[section.key] && items.length > BOARD_LIMIT && (
+                <button
+                  type="button"
+                  onClick={() => handleShowAll(section.key)}
+                  className="mx-2 mt-1 rounded-md border border-dashed border-slate-200 px-3 py-2 text-left text-xs font-medium text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+                >
+                  {UI_TEXT.morePrefix}
+                  {items.length - BOARD_LIMIT}
+                  {UI_TEXT.moreSuffix}
+                </button>
+              )}
+            </NavSection>
+          );
+        })}
+
+        <NavSection
+          label={UI_TEXT.spacesSection}
+          count={spaces.length}
+          collapsible
+          defaultOpen
+          active={activeSpaceChannel}
+          tone="default"
+        >
+          <NavLink href="/spaces" active={pathname === '/spaces'} onClick={onNavigate} muted>
+            {UI_TEXT.spacesAll}
           </NavLink>
-          {mySpaces.map((s) => (
+
+          {mySpaces.map((space) => (
             <NavLink
-              key={s.id}
-              href={spacePath(s.slug)}
-              active={pathname === spacePath(s.slug)}
+              key={space.id}
+              href={spacePath(space.slug)}
+              active={isChannelRouteActive(pathname, spacePath(space.slug))}
               onClick={onNavigate}
               joined
-              onJoinLeave={() => leave.mutate({ channelId: s.id })}
+              onJoinLeave={() => leave.mutate({ channelId: space.id })}
             >
-              · {s.name}
+              {space.name}
             </NavLink>
           ))}
-          {otherSpaces.slice(0, 3).map((s) => (
+
+          {otherSpaces.slice(0, 3).map((space) => (
             <NavLink
-              key={s.id}
-              href={spacePath(s.slug)}
-              active={pathname === spacePath(s.slug)}
+              key={space.id}
+              href={spacePath(space.slug)}
+              active={isChannelRouteActive(pathname, spacePath(space.slug))}
               onClick={onNavigate}
               joined={false}
-              onJoinLeave={() => join.mutate({ channelId: s.id })}
+              onJoinLeave={() => join.mutate({ channelId: space.id })}
             >
-              · {s.name}
+              {space.name}
             </NavLink>
           ))}
         </NavSection>
 
-        {/* 관리자 */}
         {isAdmin && (
-          <NavSection label="⚙ 관리">
+          <NavSection label={UI_TEXT.admin} count={2} collapsible defaultOpen active={false} tone="default">
             <NavLink href="/admin/channels" active={pathname === '/admin/channels'} onClick={onNavigate}>
-              채널 신청 관리
+              {UI_TEXT.adminChannels}
             </NavLink>
             <NavLink href="/admin/reports" active={pathname === '/admin/reports'} onClick={onNavigate}>
-              신고 관리
+              {UI_TEXT.adminReports}
             </NavLink>
           </NavSection>
         )}
 
-        {/* 모아보기 — 하단 보조 */}
         <div className="border-t border-slate-200 pt-1">
           <NavLink href="/feed" active={pathname === '/feed'} onClick={onNavigate} muted>
-            📰 모아보기
+            {UI_TEXT.feed}
           </NavLink>
           <div className="px-3 pb-2 pt-1 text-xs text-slate-400">
-            지금 활동 중 {onlineUserCount.toLocaleString()}명
+            {UI_TEXT.onlinePrefix} {onlineUserCount.toLocaleString()}
+            {UI_TEXT.onlineSuffix}
           </div>
         </div>
 
@@ -183,18 +277,62 @@ export function Sidebar({ onNavigate, onlineUserCount = 0 }: SidebarProps = {}) 
           onClick={() => setShowRequestModal(true)}
           className="w-full rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-500 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
         >
-          + 게시판 / 공간 개설 신청
+          {UI_TEXT.request}
         </button>
       </div>
     </aside>
   );
 }
 
-function NavSection({ label, children }: { label: string; children: React.ReactNode }) {
+function NavSection({
+  label,
+  count,
+  collapsible = false,
+  defaultOpen = true,
+  active = false,
+  tone = 'default',
+  children,
+}: {
+  label: string;
+  count: number;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
+  active?: boolean;
+  tone?: SectionTone;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  useEffect(() => {
+    if (active) {
+      setOpen(true);
+    }
+  }, [active]);
+
   return (
-    <section className="rounded-lg border border-slate-200 bg-white py-2">
-      <p className="px-3 pb-1 pt-1 text-xs font-semibold tracking-wide text-slate-400">{label}</p>
-      <nav className="px-1">{children}</nav>
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <button
+        type="button"
+        onClick={() => {
+          if (!collapsible) return;
+          setOpen((current) => !current);
+        }}
+        className={`flex w-full items-center justify-between gap-2 border-b border-slate-200 px-3 py-2 text-left text-sm font-semibold ${toneStyles[tone]}`}
+      >
+        <span className="min-w-0 truncate">{label}</span>
+        <span className="flex items-center gap-2 text-xs font-medium">
+          <span className="rounded-full bg-white/80 px-2 py-0.5 text-slate-700">{count}</span>
+          {collapsible && <span className="w-3 text-center text-slate-500">{open ? UI_TEXT.chevronDown : UI_TEXT.chevronRight}</span>}
+        </span>
+      </button>
+
+      <div
+        className={`overflow-hidden transition-all duration-200 ease-out ${
+          open ? 'max-h-[2200px] opacity-100' : 'max-h-0 opacity-0'
+        }`}
+      >
+        <nav className="px-1 py-1">{children}</nav>
+      </div>
     </section>
   );
 }
@@ -221,7 +359,7 @@ function NavLink({
       <Link
         href={href}
         onClick={onClick}
-        className={`flex-1 truncate px-3 py-2 text-sm ${
+        className={`flex-1 truncate px-3 py-2 text-sm transition-colors ${
           active
             ? 'font-semibold text-blue-700'
             : muted
@@ -231,19 +369,49 @@ function NavLink({
       >
         {children}
       </Link>
+
       {onJoinLeave !== undefined && (
         <button
+          type="button"
           onClick={onJoinLeave}
-          className={`mr-1 rounded px-1.5 py-0.5 text-xs opacity-0 group-hover:opacity-100 ${
+          className={`mr-1 rounded px-1.5 py-0.5 text-xs opacity-0 transition-opacity group-hover:opacity-100 ${
             joined
               ? 'text-slate-300 hover:text-red-400'
               : 'text-slate-400 hover:bg-blue-50 hover:text-blue-600'
           }`}
-          title={joined ? '나가기' : '참여'}
+          title={joined ? UI_TEXT.leaveTitle : UI_TEXT.joinTitle}
         >
-          {joined ? '✕' : '+'}
+          {joined ? '\u2212' : '+'}
         </button>
       )}
     </div>
   );
 }
+
+function normalizeSidebarSection(value: string | null): SidebarSectionKey | null {
+  switch (value) {
+    case 'announcement':
+    case 'company':
+    case 'subsidiary':
+    case 'lifestyle':
+    case 'career':
+    case 'anonymous':
+      return value;
+    default:
+      return null;
+  }
+}
+
+function isChannelRouteActive(pathname: string | null, href: string) {
+  if (!pathname) return false;
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+const toneStyles: Record<SectionTone, string> = {
+  default: 'bg-white text-slate-700',
+  slate: 'bg-slate-50 text-slate-700',
+  blue: 'bg-blue-50 text-blue-700',
+  orange: 'bg-orange-50 text-orange-700',
+  green: 'bg-emerald-50 text-emerald-700',
+  purple: 'bg-purple-50 text-purple-700',
+};
