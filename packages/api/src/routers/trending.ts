@@ -42,6 +42,38 @@ const featuredPostSelect = {
   featuredAt: featuredPosts.featuredAt,
 };
 
+async function fetchFeaturedPosts(limit: number) {
+  return db
+    .select({
+      id: posts.id,
+      title: posts.title,
+      content: sql<string>`left(${posts.content}, 300)`,
+      isAnonymous: posts.isAnonymous,
+      anonAlias: posts.anonAlias,
+      authorId: posts.authorId,
+      authorName: profiles.displayName,
+      authorAvatar: profiles.avatarUrl,
+      channelName: channels.name,
+      channelSlug: channels.slug,
+      upvoteCount: posts.upvoteCount,
+      commentCount: posts.commentCount,
+      viewCount: posts.viewCount,
+      mediaUrls: posts.mediaUrls,
+      flair: posts.flair,
+      kind: posts.kind,
+      isPinned: posts.isPinned,
+      createdAt: posts.createdAt,
+      hotScore: posts.hotScore,
+      featuredAt: posts.createdAt,
+    })
+    .from(posts)
+    .leftJoin(profiles, eq(posts.authorId, profiles.id))
+    .leftJoin(channels, eq(posts.channelId, channels.id))
+    .where(and(eq(posts.isDeleted, false), sql`${posts.viewCount} >= 1000`))
+    .orderBy(desc(posts.viewCount), desc(posts.createdAt))
+    .limit(limit);
+}
+
 export const trendingRouter = router({
   /**
    * Get high-level community stats for the feed sidebar.
@@ -142,16 +174,18 @@ export const trendingRouter = router({
     .input(z.object({ limit: z.number().min(1).max(20).default(FEATURED_POST_LIMIT) }).optional())
     .query(async ({ input }) => {
       const limit = input?.limit ?? FEATURED_POST_LIMIT;
-      const rows = await db
-        .select(featuredPostSelect)
-        .from(featuredPosts)
-        .innerJoin(posts, eq(featuredPosts.postId, posts.id))
-        .leftJoin(profiles, eq(posts.authorId, profiles.id))
-        .leftJoin(channels, eq(posts.channelId, channels.id))
-        .where(and(eq(posts.isDeleted, false), sql`${featuredPosts.featuredAt} >= date_trunc('day', now())`))
-        .orderBy(desc(featuredPosts.featuredAt), desc(featuredPosts.viewCountAtFeature))
-        .limit(limit);
-
-      return rows;
+      try {
+        return await db
+          .select(featuredPostSelect)
+          .from(featuredPosts)
+          .innerJoin(posts, eq(featuredPosts.postId, posts.id))
+          .leftJoin(profiles, eq(posts.authorId, profiles.id))
+          .leftJoin(channels, eq(posts.channelId, channels.id))
+          .where(and(eq(posts.isDeleted, false), sql`${featuredPosts.featuredAt} >= date_trunc('day', now())`))
+          .orderBy(desc(featuredPosts.featuredAt), desc(featuredPosts.viewCountAtFeature))
+          .limit(limit);
+      } catch {
+        return fetchFeaturedPosts(limit);
+      }
     }),
 });

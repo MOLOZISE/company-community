@@ -30,7 +30,7 @@ export default function PostDetailPage({ params }: { params: Promise<{ postId: s
   const { data: post, isLoading } = trpc.posts.getById.useQuery({ id: postId });
   const incrementView = trpc.posts.incrementViewCount.useMutation();
   const deletePost = trpc.posts.delete.useMutation({
-    onSuccess: () => { toast.success('게시물이 삭제되었습니다.'); router.push('/feed'); },
+    onSuccess: () => { toast.success('게시물이 삭제되었습니다.'); router.push('/popular'); },
   });
   const updatePost = trpc.posts.update.useMutation({
     onSuccess: () => {

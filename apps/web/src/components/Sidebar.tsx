@@ -157,7 +157,7 @@ export function Sidebar({ onNavigate, onlineUserCount = 0 }: SidebarProps = {}) 
           <NavLink href="/boards" active={pathname === '/boards' && !searchParams.get('section')} onClick={onNavigate} muted>
             📋 게시판 전체
           </NavLink>
-          <NavLink href="/feed" active={pathname === '/feed'} onClick={onNavigate} muted>
+          <NavLink href="/popular" active={pathname === '/popular'} onClick={onNavigate} muted>
             {UI_TEXT.feed}
           </NavLink>
         </section>

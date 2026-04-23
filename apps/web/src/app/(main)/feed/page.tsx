@@ -154,7 +154,7 @@ export default function FeedPage() {
               {activeChannel?.name ?? '회사 커뮤니티 보드'}
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-              {activeChannel?.description ?? '게시판별 최신 글을 빠르게 확인할 수 있습니다.'}
+              {activeChannel?.description ?? '게시판별 글을 빠르게 확인할 수 있습니다.'}
             </p>
             {activeChannel && (
               <div className="mt-2 text-xs text-slate-400">

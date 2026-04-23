@@ -446,10 +446,14 @@ export const postsRouter = router({
 
       const viewCount = Number(updated?.viewCount ?? 0);
       if (viewCount >= 1000) {
-        await db
-          .insert(featuredPosts)
-          .values({ postId: input.id, viewCountAtFeature: viewCount })
-          .onConflictDoNothing();
+        try {
+          await db
+            .insert(featuredPosts)
+            .values({ postId: input.id, viewCountAtFeature: viewCount })
+            .onConflictDoNothing();
+        } catch {
+          // Featured cache table is optional until the SQL migration is applied.
+        }
       }
 
       return { success: true };

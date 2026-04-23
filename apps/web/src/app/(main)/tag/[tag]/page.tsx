@@ -20,7 +20,7 @@ export default function TagPage({ params }: { params: Promise<{ tag: string }> }
       <div className="rounded-xl border border-slate-200 bg-white p-6 text-center">
         <p className="text-lg font-semibold text-slate-900">잘못된 태그예요</p>
         <p className="mt-2 text-sm leading-6 text-slate-500">태그 이름을 확인하고 다시 시도해 주세요.</p>
-        <Link href="/feed" className="mt-4 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">
+        <Link href="/popular" className="mt-4 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">
           피드로 돌아가기
         </Link>
       </div>
@@ -39,7 +39,7 @@ export default function TagPage({ params }: { params: Promise<{ tag: string }> }
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/feed" className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+            <Link href="/popular" className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
               전체 피드
             </Link>
             <button

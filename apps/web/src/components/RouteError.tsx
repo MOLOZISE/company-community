@@ -29,7 +29,7 @@ export function RouteError({ error, reset }: RouteErrorProps) {
             다시 시도
           </button>
           <Link
-            href="/feed"
+            href="/popular"
             className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             피드로 이동
